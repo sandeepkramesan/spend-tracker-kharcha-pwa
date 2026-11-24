@@ -1,6 +1,6 @@
 {
-  "name": "Card Spend Buckets",
-  "short_name": "Spend Buckets",
+  "name": "Kharcha",
+  "short_name": "Kharcha",
   "description": "Categorise credit card statement spends into budget buckets, on your device.",
   "start_url": "./",
   "scope": "./",

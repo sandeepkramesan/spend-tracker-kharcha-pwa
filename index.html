@@ -7,11 +7,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Spend Buckets">
+<meta name="apple-mobile-web-app-title" content="Kharcha">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<title>Card Spend Buckets</title>
+<title>Kharcha</title>
 <style>
 :root{--bg:#f6f5f1;--card:#fff;--fg:#1d2321;--muted:#6b7570;--line:#e3e1da;--acc:#2f6f5e;--acc-soft:#e1efe9;--bad:#b83a2e;--bad-soft:#f6e1de;--warn:#8a5a00}
 @media(prefers-color-scheme:dark){:root{--bg:#141716;--card:#1d2220;--fg:#e8ece9;--muted:#93a09a;--line:#2d3532;--acc:#5fb59c;--acc-soft:#1f3a32;--bad:#e5766a;--bad-soft:#3b2421;--warn:#e0a94a}}
@@ -91,8 +91,8 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 </head>
 <body>
 <div id="app">
-  <h1>Card spend buckets</h1>
-  <p class="sub0">Statements are read on this device. Nothing is uploaded anywhere. <span id="ver">v3</span></p>
+  <h1>Kharcha</h1>
+  <p class="sub0">Everything stays on this phone. Nothing is uploaded anywhere. <span id="ver">v5</span></p>
   <nav id="nav">
     <button data-tab="upload" class="on">Upload</button>
     <button data-tab="summary">Summary</button>
@@ -136,18 +136,34 @@ const fmt=n=>(n<0?'-':'')+'₹'+Math.round(Math.abs(n)).toLocaleString('en-IN');
 const fmt2=n=>'₹'+Math.abs(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const pad=n=>String(n).padStart(2,'0');
 
-/* ---------- persistence (rules, budgets, card names only; never transactions) ---------- */
-const LS='cardbuckets.v1';
-let store={rules:[],budgets:{},cardNames:{}};
-try{const s=localStorage.getItem(LS);if(s){const o=JSON.parse(s);store.rules=o.rules||[];store.budgets=o.budgets||{};store.cardNames=o.cardNames||{};}}catch(e){}
-function save(){try{localStorage.setItem(LS,JSON.stringify(store))}catch(e){}}
-
+/* ---------- persistence: everything stays on this device ---------- */
+const LS='cardbuckets.v1',LD='kharcha.data.v1';
+let store={rules:[],budgets:{},cardNames:{},cats:null,people:[],applySimilar:true};
+try{const s=localStorage.getItem(LS);if(s){const o=JSON.parse(s);store.rules=o.rules||[];store.budgets=o.budgets||{};store.cardNames=o.cardNames||{};store.cats=Array.isArray(o.cats)?o.cats:null;store.people=Array.isArray(o.people)?o.people:[];store.applySimilar=o.applySimilar!==false}}catch(e){}
+function save(){try{localStorage.setItem(LS,JSON.stringify(store))}catch(e){toast('Could not save settings. Phone storage may be full.')}}
+function saveData(){
+  try{localStorage.setItem(LD,JSON.stringify({v:1,nextId,txns:state.txns,files:state.files.filter(f=>f.status==='ok').map(f=>{const o=Object.assign({},f);delete o.sample;return o})}))}
+  catch(e){toast('Could not save transactions. Phone storage may be full.')}
+}
+function loadData(){
+  try{const s=localStorage.getItem(LD);if(!s)return;const o=JSON.parse(s);
+    state.txns=Array.isArray(o.txns)?o.txns:[];state.files=Array.isArray(o.files)?o.files:[];
+    nextId=Math.max(+o.nextId||1,...state.txns.map(t=>t.id+1),...state.files.map(f=>f.id+1),1);
+  }catch(e){}
+}
+try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
 
 /* ---------- categories ---------- */
-const CATS=[['Groceries','Needs'],['Fuel','Needs'],['Transport','Needs'],['Bills & Utilities','Needs'],['Health','Needs'],['Insurance','Needs'],['Education','Needs'],
+const DEFAULT_CATS=[['Groceries','Needs'],['Fuel','Needs'],['Transport','Needs'],['Bills & Utilities','Needs'],['Health','Needs'],['Insurance','Needs'],['Education','Needs'],
 ['Dining & Delivery','Wants'],['Personal Care','Wants'],['Shopping','Wants'],['Travel','Wants'],['Entertainment & Subscriptions','Wants'],
-['EMIs','Other'],['Fees & Interest','Other'],['Cash & Wallets','Other'],['Other','Other'],['Ignore','Ignore']];
-const BUCKET=Object.fromEntries(CATS);
+['EMIs','Other'],['Fees & Interest','Other'],['Cash & Wallets','Other'],['Other','Other']];
+let CATS,BUCKET;
+function loadCats(){
+  let c=Array.isArray(store.cats)&&store.cats.length?store.cats.filter(x=>Array.isArray(x)&&typeof x[0]==='string').map(x=>[x[0],['Needs','Wants','Other'].includes(x[1])?x[1]:'Other']):DEFAULT_CATS.map(x=>x.slice());
+  c=c.filter(x=>x[0]!=='Ignore');if(!c.some(x=>x[0]==='Other'))c.push(['Other','Other']);
+  c.push(['Ignore','Ignore']);CATS=c;BUCKET=Object.fromEntries(CATS);
+}
+loadCats();
 const RULES=[
 ['Fees & Interest',/procng fee|finance charge|interest charge|late (payment )?(fee|charge)|annual fee|joining fee|membership fee|igst|cgst|sgst|gst @|over ?limit|cash advance fee|emi processing|processing fee|fuel surcharge|convenience fee|service charge|fee reversal/i],
 ['EMIs',/offus emi|emi ?,\s?(prin|int)|mer emi|emi principal|emi interest|emi instal/i],
@@ -177,14 +193,14 @@ function merchantKey(desc){
 function classify(desc,isCredit){
   const u=desc.toUpperCase();
   if(STRONG_PAY.test(desc)||(isCredit&&PAYMENT.test(desc)))return 'Ignore';
-  for(let i=store.rules.length-1;i>=0;i--){const r=store.rules[i];if(u.includes(r.key))return r.category}
+  for(let i=store.rules.length-1;i>=0;i--){const r=store.rules[i];if(BUCKET[r.category]&&u.includes(r.key))return r.category}
   const compact=desc.replace(/\s+/g,'');
-  for(const [c,re] of RULES){if(re.test(desc)||re.test(compact))return c}
+  for(const [c,re] of RULES){if(BUCKET[c]&&(re.test(desc)||re.test(compact)))return c}
   return 'Other';
 }
 
 /* ---------- state ---------- */
-const state={tab:'upload',month:'all',txns:[],files:[],applySimilar:true,f:{card:'',cat:'',q:'',review:false,file:0},limit:100};
+const state={tab:'upload',month:'all',txns:[],files:[],f:{card:'',cat:'',q:'',review:false,file:0,person:''},limit:100};
 let nextId=1;
 const pwCache=[];
 const cardLabel=k=>store.cardNames[k]||k.replace('|',' ••');
@@ -259,7 +275,7 @@ function parseLines(lines,year){
       desc=parts.join(' ')||rest.replace(AMT,' ').replace(/\s+/g,' ').trim();
     }
     desc=desc.replace(/\(Ref#[^)]*\)?/g,'').replace(/^UPI-\d+-/i,'').replace(/\s+IN$/,'').replace(/\s+/g,' ').trim();
-    desc=desc.replace(/^\d{6,}\s+/,'').replace(FX,'').replace(/(\s+[+\-]?\d{1,5})+\s*$/,'').replace(/[\s|+\-]+$/,'').trim();
+    desc=desc.replace(/^\d{6,}\s+/,'').replace(FX,'').replace(/(\s+[+\-]?\d{1,5})+\s*$/,'').replace(/[\s|+\-]+$/,'').replace(/\s+IN$/,'').trim();
     if(desc.length<2||!/[A-Za-z]/.test(desc))return;
     if(/^(total|opening|closing|previous|statement|payment due|minimum|credit limit|available|reward|points|cashback earned|amount due)/i.test(desc))return;
     const v=amtVal(pick);
@@ -356,7 +372,7 @@ async function processFile(file,rec){
   }
   const cyc=tx.reduce((m,t)=>t.date>m?t.date:m,'').slice(0,7);
   for(const t of state.txns)if(t.fileId===rec.id)t.cyc=cyc;
-  rec.n=added;rec.dup=dup;rec.status='ok';
+  rec.cyc=cyc;rec.n=added;rec.dup=dup;rec.status='ok';
 }
 async function handleFiles(list){
   if(!window.pdfjsLib){toast('The PDF reader could not load. Reload the app.');return}
@@ -365,24 +381,51 @@ async function handleFiles(list){
     if(state.files.some(x=>x.name===f.name&&x.size===f.size&&x.status==='ok')){toast(f.name+' is already loaded');continue}
     const rec={id:nextId++,name:f.name,size:f.size,status:'reading',n:0,dup:0,skipped:[],sample:[]};
     state.files.push(rec);renderUpload();
-    try{await processFile(f,rec)}catch(e){rec.status='error';rec.error=(e&&e.message)||String(e)}
+    try{await processFile(f,rec);saveData()}catch(e){rec.status='error';rec.error=(e&&e.message)||String(e)}
     renderUpload();
   }
-  if(state.txns.length){state.tab='summary';renderAll()}
+  if(state.txns.length){state.tab='summary';renderAll()}else renderUpload()
 }
 
 /* ---------- derived ---------- */
-const months=()=>[...new Set(state.txns.map(t=>t.cyc))].sort().reverse();
+const months=()=>[...new Set(state.txns.map(t=>t.cyc).filter(Boolean))].sort().reverse();
 const visible=()=>state.txns.filter(t=>state.month==='all'||t.cyc===state.month);
-function monthName(m){const[y,mo]=m.split('-');return['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+mo-1]+' '+y}
+function monthName(m){if(!m)return'';const[y,mo]=m.split('-');return['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+mo-1]+' '+y}
+const periodLabel=()=>state.month==='all'?(months().length>1?'All statements ('+months().length+' cycles)':(months()[0]?monthName(months()[0])+' statements':'All statements')):monthName(state.month)+' statements';
+const personOf=t=>t.person&&store.people.includes(t.person)?t.person:'';
+const catNames=()=>CATS.map(c=>c[0]);
+const isSpend=t=>t.cat!=='Ignore';
+
+function analysis(){
+  const tx=visible();
+  const nm=state.month==='all'?Math.max(1,months().length):1;
+  const by={},grp={Needs:0,Wants:0,Other:0},cards={},people={},mer={};
+  let total=0,ignored=0,n=0;
+  for(const t of tx){
+    if(!isSpend(t)){ignored+=Math.abs(t.amt);continue}
+    n++;total+=t.amt;
+    by[t.cat]=(by[t.cat]||0)+t.amt;
+    const g=BUCKET[t.cat]||'Other';grp[g in grp?g:'Other']+=t.amt;
+    const cl=cardLabel(t.card);const c=cards[cl]=cards[cl]||{n:0,v:0};c.n++;c.v+=t.amt;
+    const pn=personOf(t)||'Unassigned';const p=people[pn]=people[pn]||{n:0,v:0};p.n++;p.v+=t.amt;
+    if(!t.cr){const k=merchantKey(t.desc)||t.desc.toUpperCase().slice(0,20);const m=mer[k]=mer[k]||{v:0,n:0};m.v+=t.amt;m.n++}
+  }
+  const cats=catNames().filter(c=>c!=='Ignore').map(c=>({c,g:BUCKET[c],v:by[c]||0,b:(+store.budgets[c]||0)*nm})).filter(r=>Math.abs(r.v)>0.5||r.b>0).sort((a,b)=>b.v-a.v);
+  return{tx,n,total,ignored,grp,cats,
+    cards:Object.entries(cards).sort((a,b)=>b[1].v-a[1].v),
+    people:Object.entries(people).sort((a,b)=>(a[0]==='Unassigned')-(b[0]==='Unassigned')||b[1].v-a[1].v),
+    merchants:Object.entries(mer).sort((a,b)=>b[1].v-a[1].v).slice(0,8)};
+}
+const pct=(v,t)=>t>0?Math.round(v/t*100):0;
 
 /* ---------- rendering ---------- */
-function toast(msg){const t=$('#toast');t.textContent=msg;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',2600)}
+function toast(msg){const t=$('#toast');t.textContent=msg;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',2800)}
 function showTab(){
   for(const k of['upload','summary','tx','setup']){$('#v-'+k).classList.toggle('hide',state.tab!==k)}
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===state.tab));
 }
 function renderAll(){showTab();renderUpload();renderSummary();renderTx();renderSetup()}
+function refresh(){renderUpload();renderSummary();renderTxTotals();renderTxList();renderSetup()}
 
 function fileStats(f){
   let spend=0,refund=0,pay=0;const pays=[];
@@ -390,6 +433,7 @@ function fileStats(f){
     if(t.cat==='Ignore'){pay+=Math.abs(t.amt);pays.push(t)}else if(t.amt>0)spend+=t.amt;else refund+=-t.amt}
   return{spend,refund,pay,pays,net:spend-refund};
 }
+const fileDue=f=>f.dueOverride!=null?f.dueOverride:f.due;
 function renderUpload(){
   const el=$('#fileList');
   if(!state.files.length){el.innerHTML='';return}
@@ -397,115 +441,182 @@ function renderUpload(){
   const ok=state.files.filter(f=>f.status==='ok');
   if(ok.length){
     let net=0,due=0,dueN=0;
-    for(const f of ok){net+=fileStats(f).net;const d=f.dueOverride!=null?f.dueOverride:f.due;if(d!=null){due+=d;dueN++}}
+    for(const f of ok){net+=fileStats(f).net;const d=fileDue(f);if(d!=null){due+=d;dueN++}}
     const diff=net-due;
-    h+='<div class="card"><h2>Cross-check</h2><div class="stats"><div class="stat"><div class="k">Parsed net spend</div><div class="v">'+fmt(net)+'</div></div><div class="stat"><div class="k">Statements due</div><div class="v">'+(dueN?fmt(due):'–')+'</div><div class="p">'+dueN+' of '+ok.length+' found</div></div><div class="stat"><div class="k">Difference</div><div class="v" style="color:'+(dueN&&Math.abs(diff)>Math.max(100,due*0.02)?'var(--bad)':'inherit')+'">'+(dueN?fmt(diff):'–')+'</div></div></div><div class="muted" style="margin-top:8px">Due also includes any unpaid previous balance, EMIs and fees, so small gaps are normal. A big gap on one card usually means rows were misread there. Open that card below.</div></div>';
+    h+='<div class="card"><h2>Cross-check</h2><div class="stats"><div class="stat"><div class="k">Parsed net spend</div><div class="v">'+fmt(net)+'</div></div><div class="stat"><div class="k">Statements due</div><div class="v">'+(dueN?fmt(due):'–')+'</div><div class="p">'+dueN+' of '+ok.length+' found</div></div><div class="stat"><div class="k">Difference</div><div class="v" style="color:'+(dueN&&Math.abs(diff)>Math.max(100,due*0.02)?'var(--bad)':'inherit')+'">'+(dueN?fmt(diff):'–')+'</div></div></div><div class="muted" style="margin-top:8px">Due also includes any unpaid previous balance, so small gaps are normal. A big gap on one card means rows were misread there.</div></div>';
   }
-  h+='<div class="card"><h2>Statements</h2>';
-  for(const f of state.files){
+  h+='<div class="card"><h2>Statements ('+state.files.length+')</h2>';
+  for(const f of state.files.slice().reverse()){
     h+='<div class="file"><div class="nm">'+esc(f.name)+'</div>';
     if(f.status==='reading')h+='<div class="muted">Reading…</div>';
-    else if(f.status==='error')h+='<span class="tag bad">Could not read</span><span class="muted">'+esc(f.error||'')+'</span>';
+    else if(f.status==='error')h+='<span class="tag bad">Could not read</span><span class="muted">'+esc(f.error||'')+'</span> <button class="btn sm" data-rmfile="'+f.id+'">Dismiss</button>';
     else{
-      const st=fileStats(f);const d=f.dueOverride!=null?f.dueOverride:f.due;
+      const st=fileStats(f);const d=fileDue(f);
       const gap=d!=null?st.net-d:null;const bad=gap!=null&&Math.abs(gap)>Math.max(100,d*0.02);
-      h+='<div style="margin:4px 0"><span class="tag'+(f.n?'':' bad')+'">'+f.n+' rows</span>'+(f.dup?'<span class="tag warn">'+f.dup+' duplicates skipped</span>':'')+(bad?'<span class="tag bad">doesn\'t match due</span>':(gap!=null?'<span class="tag">matches due</span>':''))+'</div>';
+      h+='<div style="margin:4px 0">'+(f.cyc?'<span class="tag">'+monthName(f.cyc)+'</span>':'')+'<span class="tag'+(f.n?'':' bad')+'">'+f.n+' rows</span>'+(f.dup?'<span class="tag warn">'+f.dup+' duplicates skipped</span>':'')+(bad?'<span class="tag bad">doesn\'t match due</span>':(gap!=null?'<span class="tag">matches due</span>':''))+'</div>';
       h+='<div class="row"><span class="muted">Card</span><input type="text" class="grow" data-card="'+esc(f.cardKey)+'" value="'+esc(cardLabel(f.cardKey))+'"></div>';
       h+='<table style="margin-top:6px"><tr><td>Spends</td><td class="r">'+fmt2(st.spend)+'</td></tr><tr><td>Refunds / credits</td><td class="r">−'+fmt2(st.refund)+'</td></tr><tr><td><b>Net spend</b></td><td class="r"><b>'+fmt2(st.net)+'</b></td></tr><tr><td>Card payments &amp; EMI conversions left out</td><td class="r">'+fmt2(st.pay)+'</td></tr>'
         +'<tr><td>Statement total due</td><td class="r"><input type="number" step="0.01" inputmode="decimal" data-due="'+f.id+'" value="'+(d!=null?d.toFixed(2):'')+'" placeholder="enter" style="width:120px;text-align:right"></td></tr></table>';
       if(f.due==null)h+='<div class="muted">Couldn\'t find the total due in this PDF. Type it in to cross-check.</div>';
-      h+='<div class="row" style="margin-top:6px"><button class="btn sm" data-showfile="'+f.id+'">See this statement\'s rows</button></div>';
-      if(st.pays.length)h+='<details><summary>Payments left out ('+st.pays.length+')</summary><pre>'+esc(st.pays.map(t=>t.date+'  '+fmt2(t.amt)+'  '+t.desc).join('\n'))+'</pre></details>';
-      if(!f.n){h+='<details open><summary>Nothing parsed. First lines of the file</summary><pre>'+esc(f.sample.join('\n'))+'</pre></details>'}
-      else if(f.skipped.length){h+='<details><summary>'+f.skipped.length+' dated lines not read</summary><pre>'+esc(f.skipped.join('\n'))+'</pre></details>'}
-      h+='<button class="btn sm danger" data-rmfile="'+f.id+'" style="margin-top:6px">Remove statement</button>';
+      if(st.pays.length)h+='<details><summary>Left out ('+st.pays.length+')</summary><pre>'+esc(st.pays.map(t=>t.date+'  '+fmt2(t.amt)+'  '+t.desc).join('\n'))+'</pre></details>';
+      if(!f.n&&f.sample&&f.sample.length){h+='<details open><summary>Nothing parsed. First lines of the file</summary><pre>'+esc(f.sample.join('\n'))+'</pre></details>'}
+      else if(f.skipped&&f.skipped.length){h+='<details><summary>'+f.skipped.length+' dated lines not read</summary><pre>'+esc(f.skipped.join('\n'))+'</pre></details>'}
+      h+='<div class="row" style="margin-top:6px"><button class="btn sm" data-showfile="'+f.id+'">See rows</button><button class="btn sm danger" data-rmfile="'+f.id+'">Remove statement</button></div>';
     }
     h+='</div>';
   }
   h+='</div>';
-  if(state.txns.length)h+='<div class="row"><button class="btn pri" data-go="summary">See summary</button><button class="btn danger" id="clearAll">Clear all</button></div>';
   el.innerHTML=h;
+}
+
+function periodSelect(id){
+  const ms=months();
+  return '<select id="'+id+'" class="monthSel"><option value="all">All statements ('+ms.length+' cycle'+(ms.length===1?'':'s')+')</option>'+ms.map(m=>'<option value="'+m+'"'+(m===state.month?' selected':'')+'>'+monthName(m)+' statements</option>').join('')+'</select>';
 }
 function renderSummary(){
   const el=$('#v-summary');
-  if(!state.txns.length){el.innerHTML='<div class="empty">Add statements on the Upload tab to see your buckets.</div>';return}
-  const tx=visible();
-  const ms=months();
-  const nm=state.month==='all'?Math.max(1,ms.length):1;
-  const by={},bk={Needs:0,Wants:0,Other:0},cards={},mer={};
-  let total=0,ignored=0;
-  for(const t of tx){
-    if(t.cat==='Ignore'){ignored+=Math.abs(t.amt);continue}
-    by[t.cat]=(by[t.cat]||0)+t.amt;total+=t.amt;
-    bk[BUCKET[t.cat]||'Other']+=t.amt;
-    const c=cards[cardLabel(t.card)]=cards[cardLabel(t.card)]||{n:0,v:0};c.n++;c.v+=t.amt;
-    if(!t.cr){const k=merchantKey(t.desc)||t.desc.toUpperCase().slice(0,20);const m=mer[k]=mer[k]||{v:0,n:0};m.v+=t.amt;m.n++}
-  }
-  const rows=CATS.map(c=>c[0]).filter(c=>c!=='Ignore').map(c=>({c,v:by[c]||0,b:(+store.budgets[c]||0)*nm})).filter(r=>r.v>0.5||r.b>0).sort((a,b)=>b.v-a.v);
-  const max=Math.max(1,...rows.map(r=>Math.max(r.v,r.b)));
-  let h='<div class="row" style="margin-bottom:10px"><select id="monthSel"><option value="all">All statements ('+ms.length+' cycle'+(ms.length>1?'s':'')+')</option>'+ms.map(m=>'<option value="'+m+'"'+(m===state.month?' selected':'')+'>'+monthName(m)+' statements</option>').join('')+'</select></div>';
-  h+='<div class="card"><div class="muted">Total spend</div><div class="big">'+fmt(total)+'</div><div class="muted">'+tx.filter(t=>t.cat!=='Ignore').length+' transactions across '+Object.keys(cards).length+' cards'+(ignored?' · '+fmt(ignored)+' of card payments & EMI conversions left out':'')+'</div>';
+  if(!state.txns.length){el.innerHTML='<div class="empty">Add statements on the Upload tab to see where the money goes.</div>';return}
+  const a=analysis();
+  const max=Math.max(1,...a.cats.map(r=>Math.max(r.v,r.b)));
+  let h='<div class="row" style="margin-bottom:10px">'+periodSelect('monthSel')+'</div>';
+  h+='<div class="card"><div class="muted">Total spend</div><div class="big">'+fmt(a.total)+'</div><div class="muted">'+a.n+' transactions across '+a.cards.length+' card'+(a.cards.length===1?'':'s')+(a.ignored?' · '+fmt(a.ignored)+' of card payments &amp; EMI conversions left out':'')+'</div>';
   h+='<div class="stats" style="margin-top:12px">';
-  for(const k of['Needs','Wants','Other']){h+='<div class="stat"><div class="k">'+k+'</div><div class="v">'+fmt(bk[k])+'</div><div class="p">'+(total>0?Math.round(bk[k]/total*100):0)+'%</div></div>'}
-  h+='</div></div>';
-  h+='<div class="card"><h2>By bucket</h2>';
-  for(const r of rows){
+  for(const k of['Needs','Wants','Other']){h+='<div class="stat"><div class="k">'+k+'</div><div class="v">'+fmt(a.grp[k])+'</div><div class="p">'+pct(a.grp[k],a.total)+'%</div></div>'}
+  h+='</div>';
+  h+='<div class="row" style="margin-top:12px"><button class="btn" id="copySum">Copy summary</button><button class="btn" id="dlSum">Download summary</button><button class="btn" id="expCsv">Download transactions</button></div><textarea id="sumBox" class="hide" readonly style="margin-top:8px"></textarea></div>';
+  h+='<div class="card"><h2>By category</h2>';
+  for(const r of a.cats){
     const over=r.b>0&&r.v>r.b;
-    h+='<div class="cat" data-cat="'+esc(r.c)+'"><div class="cat-top"><span class="nm">'+esc(r.c)+'</span><span class="amt">'+fmt(r.v)+'</span></div><div class="bar"><i class="'+(over?'over':'')+'" style="width:'+Math.min(100,r.v/max*100).toFixed(1)+'%"></i></div><div class="sub">'+(total>0?Math.round(r.v/total*100):0)+'% of spend'+(r.b>0?' · budget '+fmt(r.b)+(over?' · <span class="o">'+fmt(r.v-r.b)+' over</span>':' · '+fmt(r.b-r.v)+' left'):'')+'</div></div>';
+    h+='<div class="cat" data-cat="'+esc(r.c)+'"><div class="cat-top"><span class="nm">'+esc(r.c)+'</span><span class="amt">'+fmt(r.v)+'</span></div><div class="bar"><i class="'+(over?'over':'')+'" style="width:'+Math.max(0,Math.min(100,r.v/max*100)).toFixed(1)+'%"></i></div><div class="sub">'+pct(r.v,a.total)+'% of spend · '+esc(r.g)+(r.b>0?' · budget '+fmt(r.b)+(over?' · <span class="o">'+fmt(r.v-r.b)+' over</span>':' · '+fmt(r.b-r.v)+' left'):'')+'</div></div>';
   }
   if(!Object.keys(store.budgets).length)h+='<div class="muted" style="margin-top:8px">Set monthly budgets in Setup to see over/under here.</div>';
   h+='</div>';
-  const cr=Object.entries(cards).sort((a,b)=>b[1].v-a[1].v);
-  h+='<div class="card"><h2>By card</h2><table><tr><th>Card</th><th class="r">Txns</th><th class="r">Spend</th></tr>'+cr.map(([k,c])=>'<tr><td>'+esc(k)+'</td><td class="r">'+c.n+'</td><td class="r">'+fmt(c.v)+'</td></tr>').join('')+'</table></div>';
-  const tm=Object.entries(mer).sort((a,b)=>b[1].v-a[1].v).slice(0,8);
-  h+='<div class="card"><h2>Top merchants</h2><table>'+tm.map(([k,m])=>'<tr><td>'+esc(k)+'</td><td class="r">'+m.n+'×</td><td class="r">'+fmt(m.v)+'</td></tr>').join('')+'</table></div>';
+  h+='<div class="card"><h2>By card</h2><table><tr><th>Card</th><th class="r">Txns</th><th class="r">Spend</th></tr>'+a.cards.map(([k,c])=>'<tr data-cardgo="'+esc(k)+'" style="cursor:pointer"><td>'+esc(k)+'</td><td class="r">'+c.n+'</td><td class="r">'+fmt(c.v)+'</td></tr>').join('')+'</table></div>';
+  if(store.people.length){
+    h+='<div class="card"><h2>By person</h2><table><tr><th>Person</th><th class="r">Txns</th><th class="r">Spend</th><th class="r">Share</th></tr>'+a.people.map(([k,c])=>'<tr data-persongo="'+esc(k==='Unassigned'?'__none':k)+'" style="cursor:pointer"><td>'+esc(k)+'</td><td class="r">'+c.n+'</td><td class="r">'+fmt(c.v)+'</td><td class="r">'+pct(c.v,a.total)+'%</td></tr>').join('')+'</table></div>';
+  }
+  h+='<div class="card"><h2>Top merchants</h2><table>'+a.merchants.map(([k,m])=>'<tr><td>'+esc(k)+'</td><td class="r">'+m.n+'×</td><td class="r">'+fmt(m.v)+'</td></tr>').join('')+'</table></div>';
+  const ms=months();
   if(state.month==='all'&&ms.length>1){
-    const bm={};for(const t of state.txns){if(t.cat==='Ignore')continue;const m=t.cyc;bm[m]=(bm[m]||0)+t.amt}
+    const bm={};for(const t of state.txns){if(!isSpend(t))continue;bm[t.cyc]=(bm[t.cyc]||0)+t.amt}
     h+='<div class="card"><h2>By statement cycle</h2><table>'+ms.map(m=>'<tr><td>'+monthName(m)+'</td><td class="r">'+fmt(bm[m]||0)+'</td></tr>').join('')+'</table></div>';
   }
-  const rev=state.txns.filter(t=>t.cat==='Other'&&!t.manual).length;
+  const rev=visible().filter(t=>t.cat==='Other'&&!t.manual).length;
   if(rev)h+='<button class="btn" data-review="1" style="width:100%">'+rev+' transactions still in "Other", review them</button>';
   el.innerHTML=h;
 }
 
+function summaryText(){
+  const a=analysis();
+  const L=['Kharcha · '+periodLabel(),'Total spend: '+fmt(a.total)+' ('+a.n+' transactions, '+a.cards.length+' cards)','Needs '+fmt(a.grp.Needs)+' ('+pct(a.grp.Needs,a.total)+'%) · Wants '+fmt(a.grp.Wants)+' ('+pct(a.grp.Wants,a.total)+'%) · Other '+fmt(a.grp.Other)+' ('+pct(a.grp.Other,a.total)+'%)','','By category'];
+  for(const r of a.cats)L.push('• '+r.c+': '+fmt(r.v)+' ('+pct(r.v,a.total)+'%)'+(r.b>0?(r.v>r.b?' · '+fmt(r.v-r.b)+' over budget':' · '+fmt(r.b-r.v)+' under budget'):''));
+  L.push('','By card');for(const [k,c] of a.cards)L.push('• '+k+': '+fmt(c.v));
+  if(store.people.length){L.push('','By person');for(const [k,c] of a.people)L.push('• '+k+': '+fmt(c.v)+' ('+pct(c.v,a.total)+'%)')}
+  L.push('','Top merchants');for(const [k,m] of a.merchants)L.push('• '+k+': '+fmt(m.v));
+  return L.join('\n');
+}
+const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+function summaryCsv(){
+  const a=analysis();const R=[['Kharcha summary',periodLabel()],[],['Category','Group','Spend','Share %','Budget','Over (+) / under (-)']];
+  for(const r of a.cats)R.push([r.c,r.g,r.v.toFixed(2),pct(r.v,a.total),r.b?r.b.toFixed(2):'',r.b?(r.v-r.b).toFixed(2):'']);
+  R.push(['Total','',a.total.toFixed(2),100],[],['Group','Spend','Share %']);
+  for(const g of['Needs','Wants','Other'])R.push([g,a.grp[g].toFixed(2),pct(a.grp[g],a.total)]);
+  R.push([],['Card','Transactions','Spend']);for(const [k,c] of a.cards)R.push([k,c.n,c.v.toFixed(2)]);
+  if(store.people.length){R.push([],['Person','Transactions','Spend','Share %']);for(const [k,c] of a.people)R.push([k,c.n,c.v.toFixed(2),pct(c.v,a.total)])}
+  R.push([],['Merchant','Count','Spend']);for(const [k,m] of a.merchants)R.push([k,m.n,m.v.toFixed(2)]);
+  return R.map(r=>r.map(q).join(',')).join('\n');
+}
+function csvText(){
+  const rows=[['Date','Statement cycle','Card','Description','Amount','Type','Category','Group','Person']];
+  for(const t of visible().slice().sort((a,b)=>a.date.localeCompare(b.date)))rows.push([t.date,monthName(t.cyc),cardLabel(t.card),t.desc,t.amt.toFixed(2),t.cr?'credit':'debit',t.cat,BUCKET[t.cat]||'',personOf(t)]);
+  return rows.map(r=>r.map(q).join(',')).join('\n');
+}
+const fileSlug=()=>state.month==='all'?'all':state.month;
+
+/* ---------- transactions tab ---------- */
 function filtered(){
-  const f=state.f,q=f.q.trim().toUpperCase();
-  return visible().filter(t=>(!f.card||sameCard(t,f.card))&&(!f.cat||t.cat===f.cat)&&(!f.review||(t.cat==='Other'&&!t.manual))&&(!q||t.desc.toUpperCase().includes(q))&&(!f.file||t.fileId===f.file)).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  const f=state.f,qq=f.q.trim().toUpperCase();
+  return visible().filter(t=>(!f.card||cardLabel(t.card)===f.card)&&(!f.cat||t.cat===f.cat)&&(!f.person||(f.person==='__none'?!personOf(t):personOf(t)===f.person))&&(!f.review||(t.cat==='Other'&&!t.manual))&&(!qq||t.desc.toUpperCase().includes(qq))&&(!f.file||t.fileId===f.file)).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
 }
 function renderTx(){
   const el=$('#v-tx');
   if(!state.txns.length){el.innerHTML='<div class="empty">No transactions yet.</div>';return}
   const cards=[...new Set(state.txns.map(t=>cardLabel(t.card)))].sort();
-  let h='<div class="card"><div class="row"><select id="fCard" class="grow"><option value="">All cards</option>'+cards.map(c=>'<option value="'+esc(c)+'"'+(state.f.card===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select>'
-  +'<select id="fCat" class="grow"><option value="">All buckets</option>'+CATS.map(c=>'<option'+(state.f.cat===c[0]?' selected':'')+'>'+esc(c[0])+'</option>').join('')+'</select></div>'
-  +'<div class="row" style="margin-top:8px"><input type="text" id="fQ" class="grow" placeholder="Search merchant" value="'+esc(state.f.q)+'"></div>'
-  +'<div class="chips" style="margin:10px 0 0"><span class="chip'+(state.f.review?' on':'')+'" id="fRev">Needs review</span><span class="chip'+(state.applySimilar?' on':'')+'" id="fSim">Apply to similar merchants</span></div></div>'
-  +'<div class="card" id="txList"></div>';
+  const f=state.f;
+  let h='<div class="card"><div class="row" style="margin-bottom:8px">'+periodSelect('monthSel2')+'</div><div class="row"><select id="fCard" class="grow"><option value="">All cards</option>'+cards.map(c=>'<option value="'+esc(c)+'"'+(f.card===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select>'
+  +'<select id="fCat" class="grow"><option value="">All categories</option>'+catNames().map(c=>'<option'+(f.cat===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select></div>';
+  if(store.people.length)h+='<div class="row" style="margin-top:8px"><select id="fPerson" class="grow"><option value="">Everyone</option><option value="__none"'+(f.person==='__none'?' selected':'')+'>Unassigned</option>'+store.people.map(p=>'<option'+(f.person===p?' selected':'')+'>'+esc(p)+'</option>').join('')+'</select></div>';
+  h+='<div class="row" style="margin-top:8px"><input type="text" id="fQ" class="grow" placeholder="Search merchant" value="'+esc(f.q)+'"></div>'
+  +'<div class="chips" style="margin:10px 0 0"><span class="chip'+(f.review?' on':'')+'" id="fRev">Needs review</span><span class="chip'+(store.applySimilar?' on':'')+'" id="fSim">Remember merchant</span></div>'
+  +'<div class="muted" style="margin-top:6px">With <b>Remember merchant</b> on, changing a category saves a rule for that merchant (for example LULU → Groceries). Other transactions from that merchant move too, and future statements use the rule. Rules are listed in Setup.</div></div>'
+  +'<div class="card" id="txTotals"></div><div class="card" id="txList"></div>';
   el.innerHTML=h;
-  renderTxList();
+  renderTxTotals();renderTxList();
+}
+function renderTxTotals(){
+  const el=$('#txTotals');if(!el)return;
+  const list=filtered();
+  let spend=0,refund=0,left=0;
+  for(const t of list){if(!isSpend(t))left+=Math.abs(t.amt);else if(t.amt>0)spend+=t.amt;else refund-=t.amt}
+  const f=state.f;
+  const title=[f.card,f.cat,f.person==='__none'?'Unassigned':f.person,f.q&&'"'+f.q+'"',f.review&&'needs review'].filter(Boolean).join(' · ')||'All transactions';
+  let h='<div class="muted">'+esc(title)+' · '+esc(periodLabel())+'</div><div class="big">'+fmt(spend-refund)+'</div>'
+   +'<div class="muted">'+list.length+' transactions · spends '+fmt(spend)+(refund?' · refunds −'+fmt(refund):'')+(left?' · '+fmt(left)+' payments left out':'')+'</div>';
+  if(f.card){
+    const files=state.files.filter(x=>x.status==='ok'&&cardLabel(x.cardKey)===f.card&&(state.month==='all'||x.cyc===state.month));
+    const dues=files.map(fileDue).filter(d=>d!=null);
+    if(dues.length)h+='<div class="muted">Statement due for this card: '+fmt2(dues.reduce((a,b)=>a+b,0))+'</div>';
+  }
+  if(store.people.length&&list.length)h+='<div class="row" style="margin-top:10px"><span class="muted">Assign all '+list.length+' to</span><select id="bulkPerson" class="grow"><option value="">choose…</option><option value="__none">Nobody (clear)</option>'+store.people.map(p=>'<option>'+esc(p)+'</option>').join('')+'</select></div>';
+  el.innerHTML=h;
 }
 function renderTxList(){
   const el=$('#txList');if(!el)return;
   const list=filtered();
-  let h='<div class="muted" style="margin-bottom:6px">'+list.length+' transactions'+(state.f.file?' in one statement <button class="btn sm" id="fFileClr">show all</button>':'')+'</div>';
+  let h=state.f.file?'<div class="muted" style="margin-bottom:6px">Showing one statement <button class="btn sm" id="fFileClr">show all</button></div>':'';
+  if(!list.length)h+='<div class="empty">Nothing matches these filters.</div>';
+  const cats=catNames();
   for(const t of list.slice(0,state.limit)){
-    h+='<div class="tx"><div class="grow"><div class="d">'+esc(t.desc)+'</div><div class="m">'+t.date+' · '+esc(cardLabel(t.card))+(t.cr?' · credit':'')+'</div></div><div class="r"><div class="a'+(t.cr?' cr':'')+'"><button class="btn sm" data-flip="'+t.id+'" title="Switch debit / credit" style="padding:1px 7px;margin-right:4px">±</button>'+(t.cr?'−':'')+fmt2(t.amt)+'</div><select data-id="'+t.id+'">'+CATS.map(c=>'<option'+(c[0]===t.cat?' selected':'')+'>'+esc(c[0])+'</option>').join('')+'</select></div></div>';
+    h+='<div class="tx"><div class="grow"><div class="d">'+esc(t.desc)+'</div><div class="m">'+t.date+' · '+esc(cardLabel(t.card))+(t.cr?' · credit':'')+(t.emi?' · EMI conversion':'')+'</div>'
+     +(store.people.length?'<select data-pid="'+t.id+'" style="margin-top:4px;font-size:13px;padding:5px 6px;max-width:170px"><option value="">No person</option>'+store.people.map(p=>'<option'+(personOf(t)===p?' selected':'')+'>'+esc(p)+'</option>').join('')+'</select>':'')
+     +'</div><div class="r"><div class="a'+(t.cr?' cr':'')+'"><button class="btn sm" data-flip="'+t.id+'" title="Switch debit / credit" style="padding:1px 7px;margin-right:4px">±</button>'+(t.cr?'−':'')+fmt2(t.amt)+'</div><select data-id="'+t.id+'">'+cats.map(c=>'<option'+(c===t.cat?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select></div></div>';
   }
   if(list.length>state.limit)h+='<button class="btn" id="more" style="width:100%;margin-top:8px">Show more</button>';
   el.innerHTML=h;
 }
 
+/* ---------- setup tab ---------- */
 function renderSetup(){
   const el=$('#v-setup');
-  let h='<div class="card"><h2>Monthly budgets</h2><div class="bgrid">';
-  for(const [c] of CATS){if(c==='Ignore')continue;h+='<label for="b_'+esc(c)+'">'+esc(c)+'</label><input type="number" inputmode="numeric" min="0" id="b_'+esc(c)+'" data-b="'+esc(c)+'" placeholder="₹ / month" value="'+(store.budgets[c]||'')+'">'}
+  const groups=['Needs','Wants','Other'];
+  let h='<div class="card"><h2>Categories</h2>';
+  CATS.forEach(([c,g],i)=>{
+    if(c==='Ignore')return;
+    const n=state.txns.filter(t=>t.cat===c).length;
+    h+='<div class="row" style="padding:5px 0"><span class="grow">'+esc(c)+(n?' <span class="muted">('+n+')</span>':'')+'</span><select data-catgroup="'+i+'">'+groups.map(x=>'<option'+(x===g?' selected':'')+'>'+x+'</option>').join('')+'</select>'+(c==='Other'?'<span style="width:68px"></span>':'<button class="btn sm danger" data-delcat="'+i+'">Remove</button>')+'</div>';
+  });
+  h+='<div class="row" style="margin-top:8px"><input type="text" id="newCat" class="grow" placeholder="New category, e.g. Kids"><select id="newCatGroup">'+groups.map(x=>'<option>'+x+'</option>').join('')+'</select><button class="btn pri" id="addCat">Add</button></div>';
+  h+='<div class="muted" style="margin-top:6px">Removing a category moves its transactions to Other and drops its rules and budget. The group decides whether it counts as Needs, Wants or Other.</div></div>';
+
+  h+='<div class="card"><h2>People</h2>';
+  if(!store.people.length)h+='<div class="muted" style="margin-bottom:8px">Add people to split spend by who it was for or who spent it. Each transaction then gets a person picker, and the Summary shows spend by person.</div>';
+  store.people.forEach((p,i)=>{const n=state.txns.filter(t=>t.person===p).length;h+='<div class="row" style="padding:5px 0"><span class="grow">'+esc(p)+(n?' <span class="muted">('+n+')</span>':'')+'</span><button class="btn sm danger" data-delperson="'+i+'">Remove</button></div>'});
+  h+='<div class="row" style="margin-top:8px"><input type="text" id="newPerson" class="grow" placeholder="Name"><button class="btn pri" id="addPerson">Add</button></div></div>';
+
+  h+='<div class="card"><h2>Monthly budgets</h2><div class="bgrid">';
+  CATS.forEach(([c],i)=>{if(c==='Ignore')return;h+='<label for="b_'+i+'">'+esc(c)+'</label><input type="number" inputmode="numeric" min="0" id="b_'+i+'" data-b="'+esc(c)+'" placeholder="₹ / month" value="'+(store.budgets[c]||'')+'">'});
   h+='</div><div class="muted" style="margin-top:8px">With "All statements" selected, budgets scale by the number of statement cycles loaded.</div></div>';
-  h+='<div class="card"><h2>Your rules ('+store.rules.length+')</h2>';
-  if(!store.rules.length)h+='<div class="muted">When you change a transaction\'s bucket, the merchant is remembered here and applied to future statements.</div>';
-  for(let i=0;i<store.rules.length;i++){const r=store.rules[i];h+='<div class="row" style="padding:5px 0"><span class="grow">'+esc(r.key)+' → <b>'+esc(r.category)+'</b></span><button class="btn sm" data-delrule="'+i+'">Remove</button></div>'}
-  h+='</div>';
-  h+='<div class="card"><h2>Export</h2><div class="row"><button class="btn pri" id="expCsv">Download CSV</button><button class="btn" id="copyCsv">Copy CSV</button></div><textarea id="csvBox" class="hide" readonly style="margin-top:8px"></textarea></div>';
-  h+='<div class="card"><h2>Back up settings</h2><div class="muted" style="margin-bottom:8px">Budgets, rules and card names. Statement data is never saved.</div><div class="row"><button class="btn" id="copySet">Copy settings</button><button class="btn" id="dlSet">Download</button></div><textarea id="setBox" placeholder="Paste settings here to restore" style="margin-top:8px"></textarea><button class="btn" id="impSet" style="margin-top:6px">Restore</button></div>';
+
+  h+='<div class="card"><h2>Learned rules ('+store.rules.length+')</h2><div class="muted" style="margin-bottom:8px">Any description containing the keyword goes to that category. The newest rule wins. Built-in rules for common merchants still apply after these.</div>';
+  store.rules.slice().reverse().forEach((r,j)=>{const i=store.rules.length-1-j;h+='<div class="row" style="padding:5px 0"><span class="grow">'+esc(r.key)+' → <b>'+esc(r.category)+'</b></span><button class="btn sm" data-delrule="'+i+'">Remove</button></div>'});
+  h+='<div class="row" style="margin-top:8px"><input type="text" id="newRuleKey" class="grow" placeholder="Keyword, e.g. SAVESAGE"><select id="newRuleCat">'+catNames().map(c=>'<option>'+esc(c)+'</option>').join('')+'</select><button class="btn pri" id="addRule">Add</button></div></div>';
+
+  const nf=state.files.filter(f=>f.status==='ok').length;
+  h+='<div class="card"><h2>Data on this phone</h2><div class="muted" style="margin-bottom:8px">'+state.txns.length+' transactions from '+nf+' statements are saved on this device, along with your categories, people, rules, budgets and card names. Nothing leaves the phone.</div>'
+   +'<div class="row"><button class="btn danger" id="clearData">Clear statements &amp; transactions</button><button class="btn danger" id="resetAll">Reset everything</button></div>'
+   +'<div class="muted" style="margin-top:6px">Clear keeps your rules, categories, people and budgets. Reset also removes those.</div></div>';
+
+  h+='<div class="card"><h2>Backup</h2><div class="muted" style="margin-bottom:8px">Move everything to another phone, or keep a copy.</div><div class="row"><button class="btn" id="dlBackup">Download backup</button><button class="btn" id="copyBackup">Copy backup</button></div><textarea id="setBox" placeholder="Paste a backup here to restore" style="margin-top:8px"></textarea><button class="btn" id="impSet" style="margin-top:6px">Restore</button></div>';
   el.innerHTML=h;
 }
 
@@ -513,25 +624,20 @@ function renderSetup(){
 function setCat(id,cat){
   const t=state.txns.find(x=>x.id===id);if(!t)return;
   t.cat=cat;t.manual=true;
-  if(state.applySimilar&&cat!=='Ignore'){
+  if(store.applySimilar&&cat!=='Ignore'){
     const k=merchantKey(t.desc);
     if(k){
       store.rules=store.rules.filter(r=>r.key!==k);store.rules.push({key:k,category:cat});save();
       let n=0;
       for(const o of state.txns){if(o.id!==t.id&&!o.manual&&o.cr===t.cr&&o.desc.toUpperCase().includes(k)){o.cat=cat;n++}}
-      if(n)toast(n+' similar updated');
+      toast('Rule saved: '+k+' → '+cat+(n?' · '+n+' more moved':''));
     }
   }
-  renderSummary();renderTxList();renderSetup();
+  saveData();refresh();
 }
-function csvText(){
-  const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
-  const rows=[['Date','Card','Description','Amount','Type','Bucket','Group']];
-  for(const t of state.txns.slice().sort((a,b)=>a.date.localeCompare(b.date)))rows.push([t.date,cardLabel(t.card),t.desc,t.amt.toFixed(2),t.cr?'credit':'debit',t.cat,BUCKET[t.cat]||'']);
-  return rows.map(r=>r.map(q).join(',')).join('\n');
-}
+function reclassifyAuto(){for(const t of state.txns){if(!t.manual&&!t.emi)t.cat=classify(t.desc,t.cr)}}
 async function saveFile(name,data){
-  const type=name.endsWith('.csv')?'text/csv':'application/json';
+  const type=name.endsWith('.csv')?'text/csv':name.endsWith('.txt')?'text/plain':'application/json';
   const blob=new Blob([data],{type});
   try{
     const file=new File([blob],name,{type});
@@ -548,50 +654,104 @@ async function copyText(s,box){
   try{await navigator.clipboard.writeText(s);toast('Copied');return}catch(e){}
   if(box){box.classList.remove('hide');box.value=s;box.select();toast('Select all and copy')}
 }
+function backupJson(){return JSON.stringify({kharcha:1,store,data:{nextId,txns:state.txns,files:state.files.filter(f=>f.status==='ok').map(f=>{const o=Object.assign({},f);delete o.sample;return o})}})}
+function restore(text){
+  const o=JSON.parse(text);
+  const s=o.store||o;
+  store={rules:Array.isArray(s.rules)?s.rules.filter(r=>r&&typeof r.key==='string'&&typeof r.category==='string'):[],budgets:s.budgets&&typeof s.budgets==='object'?s.budgets:{},cardNames:s.cardNames&&typeof s.cardNames==='object'?s.cardNames:{},cats:Array.isArray(s.cats)?s.cats:null,people:Array.isArray(s.people)?s.people.filter(p=>typeof p==='string'):[],applySimilar:s.applySimilar!==false};
+  loadCats();save();
+  if(o.data&&Array.isArray(o.data.txns)){state.txns=o.data.txns;state.files=Array.isArray(o.data.files)?o.data.files:[];nextId=Math.max(+o.data.nextId||1,...state.txns.map(t=>t.id+1),...state.files.map(f=>f.id+1),1);saveData()}
+}
+function goTx(f){state.f=Object.assign({card:'',cat:'',q:'',review:false,file:0,person:''},f);state.limit=100;state.tab='tx';renderTx();showTab();window.scrollTo(0,0)}
 
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('button,[data-cat],.chip');if(!t)return;
+  const t=e.target.closest('button,[data-cat],[data-cardgo],[data-persongo],.chip');if(!t)return;
   if(t.dataset.tab){state.tab=t.dataset.tab;showTab();window.scrollTo(0,0);return}
-  if(t.dataset.go){state.tab=t.dataset.go;showTab();return}
-  if(t.dataset.cat){state.f={card:'',cat:t.dataset.cat,q:'',review:false,file:0};state.limit=100;state.tab='tx';renderTx();showTab();return}
-  if(t.dataset.review){state.f={card:'',cat:'',q:'',review:true,file:0};state.limit=100;state.tab='tx';renderTx();showTab();return}
-  if(t.dataset.showfile){state.f={card:'',cat:'',q:'',review:false,file:+t.dataset.showfile};state.month='all';state.limit=500;state.tab='tx';renderTx();renderSummary();showTab();window.scrollTo(0,0);return}
-  if(t.id==='fFileClr'){state.f.file=0;renderTxList();return}
-  if(t.dataset.flip){const x=state.txns.find(o=>o.id===+t.dataset.flip);if(x){x.cr=!x.cr;x.amt=-x.amt;if(!x.manual)x.cat=classify(x.desc,x.cr)}renderTxList();renderSummary();renderUpload();return}
-  if(t.dataset.rmfile){const id=+t.dataset.rmfile;state.txns=state.txns.filter(o=>o.fileId!==id);state.files=state.files.filter(o=>o.id!==id);renderAll();return}
+  if(t.dataset.cat!==undefined&&!t.matches('button')){goTx({cat:t.dataset.cat});return}
+  if(t.dataset.cardgo!==undefined){goTx({card:t.dataset.cardgo});return}
+  if(t.dataset.persongo!==undefined){goTx({person:t.dataset.persongo});return}
+  if(t.dataset.review){goTx({review:true});return}
+  if(t.dataset.showfile){state.month='all';goTx({file:+t.dataset.showfile});state.limit=500;renderTxList();renderSummary();return}
+  if(t.id==='fFileClr'){state.f.file=0;renderTxTotals();renderTxList();return}
+  if(t.dataset.flip){const x=state.txns.find(o=>o.id===+t.dataset.flip);if(x){x.cr=!x.cr;x.amt=-x.amt;if(!x.manual)x.cat=classify(x.desc,x.cr)}saveData();refresh();return}
+  if(t.dataset.rmfile){const id=+t.dataset.rmfile;state.txns=state.txns.filter(o=>o.fileId!==id);state.files=state.files.filter(o=>o.id!==id);if(!months().includes(state.month))state.month='all';saveData();renderAll();return}
   if(t.id==='fRev'){state.f.review=!state.f.review;renderTx();return}
-  if(t.id==='fSim'){state.applySimilar=!state.applySimilar;renderTx();return}
+  if(t.id==='fSim'){store.applySimilar=!store.applySimilar;save();renderTx();return}
   if(t.id==='more'){state.limit+=100;renderTxList();return}
-  if(t.id==='clearAll'){state.txns=[];state.files=[];state.month='all';renderAll();state.tab='upload';showTab();return}
-  if(t.dataset.delrule!==undefined){store.rules.splice(+t.dataset.delrule,1);save();renderSetup();return}
-  if(t.id==='expCsv'){if(!(await saveFile('card-spends.csv',csvText()))){await copyText(csvText(),$('#csvBox'))}return}
-  if(t.id==='copyCsv'){copyText(csvText(),$('#csvBox'));return}
-  if(t.id==='copySet'){copyText(JSON.stringify(store),$('#setBox'));return}
-  if(t.id==='dlSet'){if(!(await saveFile('card-buckets-settings.json',JSON.stringify(store,null,1)))){copyText(JSON.stringify(store),$('#setBox'))}return}
-  if(t.id==='impSet'){
-    try{const o=JSON.parse($('#setBox').value);store={rules:Array.isArray(o.rules)?o.rules.filter(r=>r&&typeof r.key==='string'&&BUCKET[r.category]):[],budgets:o.budgets&&typeof o.budgets==='object'?o.budgets:{},cardNames:o.cardNames&&typeof o.cardNames==='object'?o.cardNames:{}};save();renderAll();toast('Settings restored')}catch(err){toast('That did not look like valid settings')}
-  }
+  if(t.id==='copySum'){copyText(summaryText(),$('#sumBox'));return}
+  if(t.id==='dlSum'){if(!(await saveFile('kharcha-summary-'+fileSlug()+'.csv',summaryCsv())))copyText(summaryText(),$('#sumBox'));return}
+  if(t.id==='expCsv'){if(!(await saveFile('kharcha-transactions-'+fileSlug()+'.csv',csvText())))toast('Could not download here');return}
+  if(t.id==='addCat'){
+    const name=$('#newCat').value.trim().replace(/\s+/g,' ');const g=$('#newCatGroup').value;
+    if(!name){toast('Type a category name');return}
+    if(catNames().some(c=>c.toLowerCase()===name.toLowerCase())){toast(name+' already exists');return}
+    const i=CATS.findIndex(c=>c[0]==='Other');CATS.splice(i<0?CATS.length-1:i,0,[name,g]);store.cats=CATS.filter(c=>c[0]!=='Ignore');loadCats();save();renderAll();toast('Added '+name);return}
+  if(t.dataset.delcat!==undefined){
+    const c=CATS[+t.dataset.delcat];if(!c||c[0]==='Other'||c[0]==='Ignore')return;
+    if(!confirm('Remove "'+c[0]+'"? Its transactions move to Other.'))return;
+    store.cats=CATS.filter(x=>x[0]!==c[0]&&x[0]!=='Ignore');store.rules=store.rules.filter(r=>r.category!==c[0]);delete store.budgets[c[0]];
+    loadCats();for(const x of state.txns)if(x.cat===c[0]){x.cat='Other';x.manual=false}
+    reclassifyAuto();save();saveData();renderAll();return}
+  if(t.id==='addPerson'){
+    const name=$('#newPerson').value.trim().replace(/\s+/g,' ');
+    if(!name){toast('Type a name');return}
+    if(store.people.some(p=>p.toLowerCase()===name.toLowerCase())){toast(name+' is already added');return}
+    store.people.push(name);save();renderAll();return}
+  if(t.dataset.delperson!==undefined){
+    const p=store.people[+t.dataset.delperson];if(p==null)return;
+    if(!confirm('Remove '+p+'? Their transactions become unassigned.'))return;
+    store.people.splice(+t.dataset.delperson,1);for(const x of state.txns)if(x.person===p)delete x.person;
+    if(state.f.person===p)state.f.person='';save();saveData();renderAll();return}
+  if(t.id==='addRule'){
+    const k=$('#newRuleKey').value.trim().toUpperCase();const c=$('#newRuleCat').value;
+    if(k.length<3){toast('Use at least 3 letters');return}
+    store.rules=store.rules.filter(r=>r.key!==k);store.rules.push({key:k,category:c});save();
+    let n=0;for(const x of state.txns){if(!x.manual&&!x.emi&&x.desc.toUpperCase().includes(k)&&x.cat!=='Ignore'){x.cat=c;n++}}
+    saveData();refresh();toast('Rule saved'+(n?' · '+n+' transactions moved':''));return}
+  if(t.dataset.delrule!==undefined){store.rules.splice(+t.dataset.delrule,1);save();reclassifyAuto();saveData();refresh();return}
+  if(t.id==='clearData'){
+    if(!confirm('Delete all statements and transactions from this phone? Rules, categories, people and budgets stay.'))return;
+    state.txns=[];state.files=[];state.month='all';state.f={card:'',cat:'',q:'',review:false,file:0,person:''};saveData();state.tab='upload';renderAll();toast('Statements cleared');return}
+  if(t.id==='resetAll'){
+    if(!confirm('Reset Kharcha completely? This deletes statements, transactions, rules, categories, people, budgets and card names.'))return;
+    try{localStorage.removeItem(LS);localStorage.removeItem(LD)}catch(err){}
+    store={rules:[],budgets:{},cardNames:{},cats:null,people:[],applySimilar:true};loadCats();
+    state.txns=[];state.files=[];state.month='all';state.f={card:'',cat:'',q:'',review:false,file:0,person:''};nextId=1;state.tab='upload';renderAll();toast('Everything reset');return}
+  if(t.id==='dlBackup'){if(!(await saveFile('kharcha-backup.json',backupJson())))copyText(backupJson(),$('#setBox'));return}
+  if(t.id==='copyBackup'){copyText(backupJson(),$('#setBox'));return}
+  if(t.id==='impSet'){try{restore($('#setBox').value);renderAll();toast('Restored')}catch(err){toast('That did not look like a Kharcha backup')}return}
 });
 document.addEventListener('change',e=>{
   const t=e.target;
   if(t.id==='fileIn'){const l=[...t.files];t.value='';if(l.length)handleFiles(l);return}
-  if(t.dataset.id){setCat(+t.dataset.id,t.value);renderUpload();return}
-  if(t.dataset.due){const f=state.files.find(o=>o.id===+t.dataset.due);if(f){const v=parseFloat(t.value);f.dueOverride=isNaN(v)?null:v;renderUpload()}return}
-  if(t.id==='monthSel'){state.month=t.value;renderSummary();renderTx();return}
-  if(t.id==='fCard'){state.f.card=t.value;renderTxList();return}
-  if(t.id==='fCat'){state.f.cat=t.value;renderTxList();return}
+  if(t.dataset.id){setCat(+t.dataset.id,t.value);return}
+  if(t.dataset.pid){const x=state.txns.find(o=>o.id===+t.dataset.pid);if(x){if(t.value)x.person=t.value;else delete x.person}saveData();renderSummary();renderTxTotals();if(state.f.person)renderTxList();return}
+  if(t.id==='bulkPerson'){const v=t.value;if(!v)return;const list=filtered();for(const x of list){if(v==='__none')delete x.person;else x.person=v}saveData();toast(list.length+' transactions '+(v==='__none'?'cleared':'assigned to '+v));renderSummary();renderTxTotals();renderTxList();return}
+  if(t.dataset.catgroup!==undefined){const c=CATS[+t.dataset.catgroup];if(c){c[1]=t.value;store.cats=CATS.filter(x=>x[0]!=='Ignore');loadCats();save();renderSummary()}return}
+  if(t.dataset.due){const f=state.files.find(o=>o.id===+t.dataset.due);if(f){const v=parseFloat(t.value);f.dueOverride=isNaN(v)?null:v;saveData();renderUpload()}return}
+  if(t.id==='monthSel'||t.id==='monthSel2'){state.month=t.value;renderSummary();renderTx();return}
+  if(t.id==='fCard'){state.f.card=t.value;renderTxTotals();renderTxList();return}
+  if(t.id==='fCat'){state.f.cat=t.value;renderTxTotals();renderTxList();return}
+  if(t.id==='fPerson'){state.f.person=t.value;renderTxTotals();renderTxList();return}
 });
 document.addEventListener('input',e=>{
   const t=e.target;
-  if(t.id==='fQ'){state.f.q=t.value;renderTxList();return}
+  if(t.id==='fQ'){state.f.q=t.value;renderTxTotals();renderTxList();return}
   if(t.dataset.b!==undefined){const v=parseFloat(t.value);if(v>0)store.budgets[t.dataset.b]=v;else delete store.budgets[t.dataset.b];save();renderSummary();return}
-  if(t.dataset.card!==undefined){const v=t.value.trim();if(v)store.cardNames[t.dataset.card]=v;else delete store.cardNames[t.dataset.card];save();renderSummary();renderTx();renderSetup()}
+  if(t.dataset.card!==undefined){const v=t.value.trim();if(v)store.cardNames[t.dataset.card]=v;else delete store.cardNames[t.dataset.card];save();renderSummary();renderTx();return}
+});
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Enter')return;
+  const map={newCat:'addCat',newPerson:'addPerson',newRuleKey:'addRule'};
+  if(map[e.target.id]){e.preventDefault();$('#'+map[e.target.id]).click()}
 });
 const drop=$('#drop');
 ['dragenter','dragover'].forEach(n=>drop.addEventListener(n,e=>{e.preventDefault();drop.classList.add('over')}));
 ['dragleave','drop'].forEach(n=>drop.addEventListener(n,e=>{e.preventDefault();drop.classList.remove('over')}));
 drop.addEventListener('drop',e=>{const l=[...(e.dataTransfer.files||[])].filter(f=>/pdf$/i.test(f.name)||f.type==='application/pdf');if(l.length)handleFiles(l)});
 
+loadData();
+if(state.txns.length)state.tab='summary';
 renderAll();
 
 /* ---------- PWA: offline + files shared from other apps (Android) ---------- */
