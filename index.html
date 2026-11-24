@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2f6f5e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Spend Buckets">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Card Spend Buckets</title>
+<style>
+:root{--bg:#f6f5f1;--card:#fff;--fg:#1d2321;--muted:#6b7570;--line:#e3e1da;--acc:#2f6f5e;--acc-soft:#e1efe9;--bad:#b83a2e;--bad-soft:#f6e1de;--warn:#8a5a00}
+@media(prefers-color-scheme:dark){:root{--bg:#141716;--card:#1d2220;--fg:#e8ece9;--muted:#93a09a;--line:#2d3532;--acc:#5fb59c;--acc-soft:#1f3a32;--bad:#e5766a;--bad-soft:#3b2421;--warn:#e0a94a}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#app{max-width:760px;margin:0 auto;padding:calc(16px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) calc(80px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left))}
+h1{font-size:20px;margin:4px 0 2px}
+.sub0{color:var(--muted);font-size:13px;margin:0 0 12px}
+nav{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:14px;position:sticky;top:calc(6px + env(safe-area-inset-top));z-index:5}
+nav button{flex:1;border:0;background:transparent;color:var(--muted);padding:9px 4px;border-radius:9px;font:inherit;font-size:14px;cursor:pointer}
+nav button.on{background:var(--acc);color:#fff;font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.card h2{font-size:15px;margin:0 0 10px}
+.drop{display:block;border:2px dashed var(--line);border-radius:14px;padding:26px 14px;text-align:center;cursor:pointer;background:var(--card)}
+.drop.over{border-color:var(--acc);background:var(--acc-soft)}
+.drop b{display:block;font-size:16px;margin-bottom:4px}
+.drop span{color:var(--muted);font-size:13px}
+.drop input{display:none}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--fg);padding:9px 14px;border-radius:10px;font:inherit;font-size:14px;cursor:pointer}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn.danger{color:var(--bad)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+input[type=text],input[type=number],input[type=password],select,textarea{font:inherit;font-size:14px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;min-width:0;max-width:100%}
+textarea{width:100%;min-height:90px}
+.file{padding:10px 0;border-top:1px solid var(--line)}
+.file:first-of-type{border-top:0}
+.file .nm{font-weight:600;word-break:break-all;font-size:14px}
+.tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:99px;background:var(--acc-soft);color:var(--acc);margin-right:4px}
+.tag.bad{background:var(--bad-soft);color:var(--bad)}
+.tag.warn{background:var(--bad-soft);color:var(--warn)}
+.muted{color:var(--muted);font-size:13px}
+details{margin-top:6px}
+summary{cursor:pointer;color:var(--muted);font-size:13px}
+pre{white-space:pre-wrap;word-break:break-word;font-size:12px;background:var(--bg);padding:8px;border-radius:8px;max-height:220px;overflow:auto;margin:6px 0 0}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--bg);border-radius:10px;padding:10px}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .v{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat .p{font-size:12px;color:var(--muted)}
+.big{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+.cat{padding:9px 0;border-top:1px solid var(--line);cursor:pointer}
+.cat:first-child{border-top:0}
+.cat-top{display:flex;justify-content:space-between;gap:8px}
+.cat .nm{font-weight:600}
+.cat .amt{font-variant-numeric:tabular-nums;font-weight:600}
+.bar{height:7px;background:var(--bg);border-radius:9px;margin:6px 0 3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--acc);border-radius:9px}
+.bar i.over{background:var(--bad)}
+.cat .sub{font-size:12px;color:var(--muted)}
+.cat .sub .o{color:var(--bad);font-weight:600}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{padding:7px 4px;border-top:1px solid var(--line);text-align:left}
+th{font-size:12px;color:var(--muted);font-weight:500;border-top:0}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+.tx{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.tx:first-child{border-top:0}
+.tx .d{font-size:14px;word-break:break-word}
+.tx .m{font-size:12px;color:var(--muted)}
+.tx .r{text-align:right;flex:none}
+.tx .a{font-variant-numeric:tabular-nums;font-weight:600}
+.tx .a.cr{color:var(--acc)}
+.tx select{margin-top:4px;font-size:13px;padding:5px 6px;max-width:170px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:99px;padding:5px 12px;font-size:13px;cursor:pointer}
+.chip.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.bgrid{display:grid;grid-template-columns:1fr 120px;gap:8px 10px;align-items:center}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:20;padding:16px}
+.modal.on{display:flex}
+.modal .box{background:var(--card);border-radius:14px;padding:16px;width:100%;max-width:360px}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:99px;font-size:14px;display:none;z-index:30;max-width:90%}
+.hide{display:none}
+.empty{text-align:center;color:var(--muted);padding:30px 10px}
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>Card spend buckets</h1>
+  <p class="sub0">Statements are read on this device. Nothing is uploaded anywhere. <span id="ver">v1</span></p>
+  <nav id="nav">
+    <button data-tab="upload" class="on">Upload</button>
+    <button data-tab="summary">Summary</button>
+    <button data-tab="tx">Transactions</button>
+    <button data-tab="setup">Setup</button>
+  </nav>
+
+  <section id="v-upload">
+    <label class="drop" id="drop">
+      <input type="file" id="fileIn" accept=".pdf,application/pdf" multiple>
+      <b>Choose statement PDFs</b>
+      <span>Select all your cards' statements at once. Password-protected PDFs are fine, you'll be asked.</span>
+    </label>
+    <div id="fileList" style="margin-top:12px"></div>
+  </section>
+  <section id="v-summary" class="hide"></section>
+  <section id="v-tx" class="hide"></section>
+  <section id="v-setup" class="hide"></section>
+</div>
+
+<div class="modal" id="pwModal"><div class="box">
+  <div style="font-weight:600;margin-bottom:4px">Password needed</div>
+  <div class="muted" id="pwName" style="margin-bottom:8px;word-break:break-all"></div>
+  <div class="muted" id="pwWrong" style="color:var(--bad);display:none;margin-bottom:6px">That password didn't work.</div>
+  <input type="password" id="pwIn" style="width:100%" autocomplete="off" placeholder="PDF password">
+  <div class="muted" style="margin:8px 0">It's tried automatically on the other files. It's never stored.</div>
+  <div class="row" style="justify-content:flex-end">
+    <button class="btn" id="pwSkip">Skip file</button>
+    <button class="btn pri" id="pwOk">Unlock</button>
+  </div>
+</div></div>
+<div id="toast"></div>
+
+<script src="pdf.min.js"></script>
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>(n<0?'-':'')+'₹'+Math.round(Math.abs(n)).toLocaleString('en-IN');
+const fmt2=n=>'₹'+Math.abs(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const pad=n=>String(n).padStart(2,'0');
+
+/* ---------- persistence (rules, budgets, card names only; never transactions) ---------- */
+const LS='cardbuckets.v1';
+let store={rules:[],budgets:{},cardNames:{}};
+try{const s=localStorage.getItem(LS);if(s){const o=JSON.parse(s);store.rules=o.rules||[];store.budgets=o.budgets||{};store.cardNames=o.cardNames||{};}}catch(e){}
+function save(){try{localStorage.setItem(LS,JSON.stringify(store))}catch(e){}}
+
+
+/* ---------- categories ---------- */
+const CATS=[['Groceries','Needs'],['Fuel','Needs'],['Transport','Needs'],['Bills & Utilities','Needs'],['Health','Needs'],['Insurance','Needs'],['Education','Needs'],
+['Dining & Delivery','Wants'],['Shopping','Wants'],['Travel','Wants'],['Entertainment & Subscriptions','Wants'],
+['Fees & Interest','Other'],['Cash & Wallets','Other'],['Other','Other'],['Ignore','Ignore']];
+const BUCKET=Object.fromEntries(CATS);
+const RULES=[
+['Fees & Interest',/finance charge|interest charge|late (payment )?(fee|charge)|annual fee|joining fee|membership fee|igst|cgst|sgst|gst @|over ?limit|cash advance fee|emi processing|processing fee|fuel surcharge|convenience fee|service charge|fee reversal/i],
+['Cash & Wallets',/\batm\b|cash withdrawal|cash advance|wallet|add money|mobikwik|freecharge|upi lite/i],
+['Insurance',/insurance|\blic\b|lic of india|hdfc life|icici pru|sbi life|max life|star health|care health|niva bupa|policybazaar|\backo\b|\bdigit\b|bajaj allianz|tata aig/i],
+['Groceries',/bigbasket|big basket|blinkit|grofers|zepto|instamart|dmart|d-mart|avenue supermarts|reliance (fresh|smart|retail)|more retail|spencer|nature'?s basket|jiomart|country delight|licious|fresh ?to ?home|milkbasket|supermarket|kirana|grocer|star bazaar|vegetable|fruits/i],
+['Dining & Delivery',/swiggy|zomato|eatsure|domino|pizza|mcdonald|\bkfc\b|burger|starbucks|cafe|coffee|restaurant|bakery|barbeque|biryani|haldiram|subway|chaayos|dunzo|dining|kitchen|brewing|\bpub\b|eatery|dhaba|food|sweets/i],
+['Fuel',/hpcl|bpcl|iocl|indian ?oil|bharat petroleum|hindustan petroleum|\bshell\b|reliance bp|jio-?bp|nayara|petrol|fuel|filling station|essar/i],
+['Travel',/irctc|makemytrip|\bmmt\b|goibibo|cleartrip|ixigo|yatra|indigo|interglobe|air ?india|vistara|akasa|spicejet|air ?asia|emirates|booking\.com|agoda|airbnb|\boyo\b|taj hotel|marriott|hyatt|treebo|fabhotel|redbus|abhibus|lounge|travel|hotel|resort|\bihg\b|lemon tree|airlines/i],
+['Transport',/\buber\b|\bola\b|olacabs|rapido|meru|fastag|nhai|metro|dmrc|bmtc|parking|\btoll\b|namma|yulu|blusmart/i],
+['Entertainment & Subscriptions',/netflix|hotstar|disney|prime video|spotify|youtube|google ?(play|one|storage)|apple\.com\/bill|apple ?services|itunes|icloud|bookmyshow|\bpvr\b|\binox\b|cinepolis|sonyliv|zee5|jiocinema|audible|kindle|steam|playstation|xbox|nintendo|linkedin|openai|chatgpt|anthropic|claude\.ai|github|dropbox|notion|canva|adobe|microsoft|gaana|wynk|dream11|\bmpl\b|gaming|wonderla|imagica/i],
+['Bills & Utilities',/\bjio\b|reliance jio|airtel|vodafone|\bvi\b|bsnl|act fibernet|hathway|tata ?(sky|play)|dish ?tv|bescom|msedcl|tata power|adani (electricity|gas)|\bbses\b|mahanagar gas|indraprastha|\bigl\b|electricity|broadband|water bill|gas bill|piped gas|bharat ?bill|bbps|billdesk|\bcred\b|\brent\b|society|maintenance|recharge|\bdth\b|municipal|property tax|income tax|nobroker/i],
+['Health',/apollo|pharm|medplus|1mg|netmeds|practo|hospital|clinic|diagnostic|\blab\b|thyrocare|lal path|pathology|medical|dental|doctor|healthians|cult\.?fit|gym|fitness|wellness|optical|manipal|fortis|medanta|health/i],
+['Education',/school|college|university|tuition|coursera|udemy|byju|unacademy|upgrad|vedantu|academy|institute|\bexam\b|crossword|skillshare|duolingo/i],
+['Shopping',/amazon|amzn|flipkart|myntra|ajio|nykaa|meesho|tata ?cliq|reliance digital|croma|vijay sales|ikea|decathlon|lifestyle|westside|pantaloons|max fashion|shoppers stop|zara|h&m|uniqlo|lenskart|firstcry|pepperfry|urban ladder|\bbata\b|titan|tanishq|apple store|samsung|oneplus|fashion|\bmall\b|retail|store|\bmart\b/i]
+];
+const PAYMENT=/payment|thank you|autopay|auto debit|neft|imps|\bupi\b|bbps|repay|received|billdesk|cc ?pay|netbanking|net banking|ecs|nach/i;
+const STOP=new Set('UPI POS PURCHASE PAYMENT ONLINE THE AND FOR PVT LTD LIMITED INDIA IND IN MUMBAI BANGALORE BENGALURU DELHI NEW GURGAON GURUGRAM HYDERABAD CHENNAI PUNE KOLKATA NOIDA THANE WWW COM HTTPS TECHNOLOGIES SERVICES RETAIL'.split(' '));
+
+function merchantKey(desc){
+  const w=desc.toUpperCase().replace(/[^A-Z ]+/g,' ').split(/\s+/).filter(x=>x.length>=3&&!STOP.has(x));
+  if(!w.length)return '';
+  return w[0].length>=5?w[0]:w.slice(0,2).join(' ');
+}
+function classify(desc,isCredit){
+  const u=desc.toUpperCase();
+  if(isCredit&&PAYMENT.test(desc))return 'Ignore';
+  for(let i=store.rules.length-1;i>=0;i--){const r=store.rules[i];if(u.includes(r.key))return r.category}
+  for(const [c,re] of RULES){if(re.test(desc))return c}
+  return 'Other';
+}
+
+/* ---------- state ---------- */
+const state={tab:'upload',month:'all',txns:[],files:[],applySimilar:true,f:{card:'',cat:'',q:'',review:false},limit:100};
+let nextId=1;
+const pwCache=[];
+const cardLabel=k=>store.cardNames[k]||k.replace('|',' ••');
+
+/* ---------- PDF reading ---------- */
+function askPassword(name,wrong){
+  return new Promise(res=>{
+    $('#pwName').textContent=name;$('#pwWrong').style.display=wrong?'block':'none';
+    const inp=$('#pwIn');inp.value='';$('#pwModal').classList.add('on');setTimeout(()=>inp.focus(),50);
+    const done=v=>{$('#pwModal').classList.remove('on');$('#pwOk').onclick=$('#pwSkip').onclick=inp.onkeydown=null;res(v)};
+    $('#pwOk').onclick=()=>done(inp.value);
+    $('#pwSkip').onclick=()=>done(null);
+    inp.onkeydown=e=>{if(e.key==='Enter')done(inp.value)};
+  });
+}
+async function extractLines(pdf){
+  const out=[];
+  for(let p=1;p<=pdf.numPages;p++){
+    const page=await pdf.getPage(p);const tc=await page.getTextContent();
+    const items=tc.items.filter(i=>i.str&&i.str.trim()!=='');
+    items.sort((a,b)=>b.transform[5]-a.transform[5]);
+    const rows=[];
+    for(const it of items){const y=it.transform[5];const r=rows[rows.length-1];if(r&&Math.abs(r.y-y)<=3)r.items.push(it);else rows.push({y,items:[it]})}
+    for(const r of rows){
+      r.items.sort((a,b)=>a.transform[4]-b.transform[4]);
+      let s='',end=null;
+      for(const it of r.items){const x=it.transform[4];if(end!==null&&x-end>1.5&&!s.endsWith(' ')&&!it.str.startsWith(' '))s+=' ';s+=it.str;end=x+it.width}
+      s=s.replace(/\s+/g,' ').trim();if(s)out.push(s);
+    }
+  }
+  return out;
+}
+const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function mk(y,mo,d,len){if(y<100)y+=2000;if(mo<1||mo>12||d<1||d>31||y<2000||y>2100)return null;return{iso:y+'-'+pad(mo)+'-'+pad(d),len}}
+function parseDate(line,year){
+  let m=line.match(/^[^\dA-Za-z]*(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4}|\d{2})(?!\d)/);
+  if(m)return mk(+m[3],+m[2],+m[1],m[0].length);
+  m=line.match(/^[^\dA-Za-z]*(\d{1,2})[\s\-]+([A-Za-z]{3,9})[\s\-,']*(\d{4}|\d{2})(?!\d)/);
+  if(m&&MON[m[2].slice(0,3).toLowerCase()])return mk(+m[3],MON[m[2].slice(0,3).toLowerCase()],+m[1],m[0].length);
+  m=line.match(/^[^\dA-Za-z]*([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})(?!\d)/);
+  if(m&&MON[m[1].slice(0,3).toLowerCase()])return mk(+m[3],MON[m[1].slice(0,3).toLowerCase()],+m[2],m[0].length);
+  m=line.match(/^[^\dA-Za-z]*(\d{1,2})\s+([A-Za-z]{3})\b(?!\s*[\d'])/);
+  if(m&&year&&MON[m[2].toLowerCase()])return mk(year,MON[m[2].toLowerCase()],+m[1],m[0].length);
+  return null;
+}
+const AMT=/(-?\d[\d,]*\.\d{2})(?:\s?(CR|DR|Cr|Dr|cr|dr|C|D)(?![A-Za-z]))?/g;
+const DATEANY=/\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}|\d{1,2}\s[A-Za-z]{3}\s?\d{2,4}/;
+function parseLines(lines,year){
+  const tx=[],skipped=[];
+  for(const line of lines){
+    const d=parseDate(line,year);
+    if(!d){if(skipped.length<20&&DATEANY.test(line)&&/\d\.\d{2}/.test(line))skipped.push(line);continue}
+    let rest=line.slice(d.len).replace(/^\s*[|,]?\s*\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM)?/i,'').trim();
+    const ms=[...rest.matchAll(AMT)];
+    if(!ms.length){if(skipped.length<20&&/\d/.test(rest))skipped.push(line);continue}
+    const last=ms[ms.length-1];
+    let desc=rest.slice(0,ms[0].index).trim();
+    if(desc.length<3)desc=rest.replace(AMT,' ').replace(/\s+/g,' ').trim();
+    desc=desc.replace(/^\d{6,}\s+/,'').replace(/[\s|]+$/,'');
+    if(desc.length<2||!/[A-Za-z]/.test(desc))continue;
+    if(/^(total|opening|closing|previous|statement|payment due|minimum|credit limit|available|reward)/i.test(desc))continue;
+    const v=parseFloat(last[1].replace(/[,-]/g,''));
+    if(!v)continue;
+    const cr=!!(last[1].startsWith('-')||(last[2]&&/^c/i.test(last[2])));
+    tx.push({date:d.iso,desc,amt:cr?-v:v,cr});
+  }
+  return{tx,skipped};
+}
+const BANKS=[['HDFC',/hdfc/i],['ICICI',/icici/i],['SBI Card',/sbi card|sbicard/i],['Axis',/axis bank/i],['Kotak',/kotak/i],['Amex',/american express|amex/i],['IDFC FIRST',/idfc/i],['Yes Bank',/yes bank/i],['RBL',/\brbl\b/i],['IndusInd',/indusind/i],['StanChart',/standard chartered/i],['Citi',/citibank|\bciti\b/i],['AU',/au small finance/i],['Federal',/federal bank/i],['OneCard',/onecard|fpl technologies/i],['HSBC',/hsbc/i],['IDBI',/idbi/i],['PNB',/punjab national/i],['BoB',/bank of baroda/i]];
+function detectCard(head){
+  let best=null;
+  for(const [n,re] of BANKS){const m=head.match(re);if(m&&(best===null||m.index<best.i))best={n,i:m.index}}
+  const l=head.match(/(?:[\dXx*•]{4}[\s-]+){2,3}(\d{4})\b/);
+  return(best?best.n:'Card')+'|'+(l?l[1]:'????');
+}
+async function processFile(file,rec){
+  const buf=new Uint8Array(await file.arrayBuffer());
+  const task=pdfjsLib.getDocument({data:buf});
+  let tried=0,cancelled=false;
+  task.onPassword=(update,reason)=>{
+    if(tried<pwCache.length){update(pwCache[tried++]);return}
+    askPassword(file.name,reason===2).then(r=>{
+      if(r===null||r===''){cancelled=true;task.destroy();return}
+      if(!pwCache.includes(r))pwCache.push(r);tried=pwCache.length;update(r);
+    });
+  };
+  let pdf;
+  try{pdf=await task.promise}catch(e){if(cancelled)throw new Error('Skipped, no password given');throw e}
+  const lines=await extractLines(pdf);
+  const head=lines.slice(0,80).join(' ');
+  const years={};(lines.join(' ').match(/\b20\d{2}\b/g)||[]).forEach(y=>years[y]=(years[y]||0)+1);
+  const year=+Object.keys(years).sort((a,b)=>years[b]-years[a])[0]||new Date().getFullYear();
+  const cardKey=detectCard(head);
+  const {tx,skipped}=parseLines(lines,year);
+  rec.cardKey=cardKey;rec.skipped=skipped;rec.sample=lines.slice(0,40);rec.pages=pdf.numPages;
+  const seen=new Set(state.txns.map(t=>t.sig));
+  let added=0,dup=0;
+  for(const t of tx){
+    const sig=[cardKey,t.date,t.amt,t.desc.toUpperCase().replace(/\s+/g,' ')].join('|');
+    if(seen.has(sig)&&!state.txns.some(o=>o.sig===sig&&o.fileId===rec.id)){dup++;continue}
+    state.txns.push({id:nextId++,fileId:rec.id,sig,card:cardKey,date:t.date,desc:t.desc,amt:t.amt,cr:t.cr,cat:classify(t.desc,t.cr),manual:false});
+    added++;
+  }
+  rec.n=added;rec.dup=dup;rec.status='ok';
+}
+async function handleFiles(list){
+  if(!window.pdfjsLib){toast('The PDF reader could not load. Reload the app.');return}
+  pdfjsLib.GlobalWorkerOptions.workerSrc='pdf.worker.min.js';
+  for(const f of list){
+    const rec={id:nextId++,name:f.name,status:'reading',n:0,dup:0,skipped:[],sample:[]};
+    state.files.push(rec);renderUpload();
+    try{await processFile(f,rec)}catch(e){rec.status='error';rec.error=(e&&e.message)||String(e)}
+    renderUpload();
+  }
+  if(state.txns.length){state.tab='summary';renderAll()}
+}
+
+/* ---------- derived ---------- */
+const months=()=>[...new Set(state.txns.map(t=>t.date.slice(0,7)))].sort().reverse();
+const visible=()=>state.txns.filter(t=>state.month==='all'||t.date.startsWith(state.month));
+function monthName(m){const[y,mo]=m.split('-');return['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+mo-1]+' '+y}
+
+/* ---------- rendering ---------- */
+function toast(msg){const t=$('#toast');t.textContent=msg;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',2600)}
+function showTab(){
+  for(const k of['upload','summary','tx','setup']){$('#v-'+k).classList.toggle('hide',state.tab!==k)}
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===state.tab));
+}
+function renderAll(){showTab();renderUpload();renderSummary();renderTx();renderSetup()}
+
+function renderUpload(){
+  const el=$('#fileList');
+  if(!state.files.length){el.innerHTML='';return}
+  let h='<div class="card"><h2>Statements</h2>';
+  for(const f of state.files){
+    h+='<div class="file"><div class="nm">'+esc(f.name)+'</div>';
+    if(f.status==='reading')h+='<div class="muted">Reading…</div>';
+    else if(f.status==='error')h+='<span class="tag bad">Could not read</span><span class="muted">'+esc(f.error||'')+'</span>';
+    else{
+      h+='<div style="margin:4px 0"><span class="tag'+(f.n?'':' bad')+'">'+f.n+' transactions</span>'+(f.dup?'<span class="tag warn">'+f.dup+' duplicates skipped</span>':'')+'</div>';
+      h+='<div class="row"><span class="muted">Card name</span><input type="text" class="grow" data-card="'+esc(f.cardKey)+'" value="'+esc(cardLabel(f.cardKey))+'"></div>';
+      if(f.cardKey.endsWith('????'))h+='<div class="muted" style="margin-top:4px">Couldn\'t find the last 4 digits. Rename this card so it stays distinct.</div>';
+      if(!f.n){h+='<details open><summary>Nothing parsed. First lines of the file, so the layout can be checked</summary><pre>'+esc(f.sample.join('\n'))+'</pre></details>'}
+      else if(f.skipped.length){h+='<details><summary>'+f.skipped.length+' dated lines not read, check these</summary><pre>'+esc(f.skipped.join('\n'))+'</pre></details>'}
+    }
+    h+='</div>';
+  }
+  h+='</div>';
+  if(state.txns.length)h+='<div class="row"><button class="btn pri" data-go="summary">See summary</button><button class="btn danger" id="clearAll">Clear loaded statements</button></div>';
+  el.innerHTML=h;
+}
+
+function renderSummary(){
+  const el=$('#v-summary');
+  if(!state.txns.length){el.innerHTML='<div class="empty">Add statements on the Upload tab to see your buckets.</div>';return}
+  const tx=visible();
+  const ms=months();
+  const nm=state.month==='all'?Math.max(1,ms.length):1;
+  const by={},bk={Needs:0,Wants:0,Other:0},cards={},mer={};
+  let total=0,ignored=0;
+  for(const t of tx){
+    if(t.cat==='Ignore'){ignored+=Math.abs(t.amt);continue}
+    by[t.cat]=(by[t.cat]||0)+t.amt;total+=t.amt;
+    bk[BUCKET[t.cat]||'Other']+=t.amt;
+    const c=cards[t.card]=cards[t.card]||{n:0,v:0};c.n++;c.v+=t.amt;
+    if(!t.cr){const k=merchantKey(t.desc)||t.desc.toUpperCase().slice(0,20);const m=mer[k]=mer[k]||{v:0,n:0};m.v+=t.amt;m.n++}
+  }
+  const rows=CATS.map(c=>c[0]).filter(c=>c!=='Ignore').map(c=>({c,v:by[c]||0,b:(+store.budgets[c]||0)*nm})).filter(r=>r.v>0.5||r.b>0).sort((a,b)=>b.v-a.v);
+  const max=Math.max(1,...rows.map(r=>Math.max(r.v,r.b)));
+  let h='<div class="row" style="margin-bottom:10px"><select id="monthSel"><option value="all">All months ('+ms.length+')</option>'+ms.map(m=>'<option value="'+m+'"'+(m===state.month?' selected':'')+'>'+monthName(m)+'</option>').join('')+'</select></div>';
+  h+='<div class="card"><div class="muted">Total spend</div><div class="big">'+fmt(total)+'</div><div class="muted">'+tx.filter(t=>t.cat!=='Ignore').length+' transactions across '+Object.keys(cards).length+' cards'+(ignored?' · '+fmt(ignored)+' of card payments left out':'')+'</div>';
+  h+='<div class="stats" style="margin-top:12px">';
+  for(const k of['Needs','Wants','Other']){h+='<div class="stat"><div class="k">'+k+'</div><div class="v">'+fmt(bk[k])+'</div><div class="p">'+(total>0?Math.round(bk[k]/total*100):0)+'%</div></div>'}
+  h+='</div></div>';
+  h+='<div class="card"><h2>By bucket</h2>';
+  for(const r of rows){
+    const over=r.b>0&&r.v>r.b;
+    h+='<div class="cat" data-cat="'+esc(r.c)+'"><div class="cat-top"><span class="nm">'+esc(r.c)+'</span><span class="amt">'+fmt(r.v)+'</span></div><div class="bar"><i class="'+(over?'over':'')+'" style="width:'+Math.min(100,r.v/max*100).toFixed(1)+'%"></i></div><div class="sub">'+(total>0?Math.round(r.v/total*100):0)+'% of spend'+(r.b>0?' · budget '+fmt(r.b)+(over?' · <span class="o">'+fmt(r.v-r.b)+' over</span>':' · '+fmt(r.b-r.v)+' left'):'')+'</div></div>';
+  }
+  if(!Object.keys(store.budgets).length)h+='<div class="muted" style="margin-top:8px">Set monthly budgets in Setup to see over/under here.</div>';
+  h+='</div>';
+  const cr=Object.entries(cards).sort((a,b)=>b[1].v-a[1].v);
+  h+='<div class="card"><h2>By card</h2><table><tr><th>Card</th><th class="r">Txns</th><th class="r">Spend</th></tr>'+cr.map(([k,c])=>'<tr><td>'+esc(cardLabel(k))+'</td><td class="r">'+c.n+'</td><td class="r">'+fmt(c.v)+'</td></tr>').join('')+'</table></div>';
+  const tm=Object.entries(mer).sort((a,b)=>b[1].v-a[1].v).slice(0,8);
+  h+='<div class="card"><h2>Top merchants</h2><table>'+tm.map(([k,m])=>'<tr><td>'+esc(k)+'</td><td class="r">'+m.n+'×</td><td class="r">'+fmt(m.v)+'</td></tr>').join('')+'</table></div>';
+  if(state.month==='all'&&ms.length>1){
+    const bm={};for(const t of state.txns){if(t.cat==='Ignore')continue;const m=t.date.slice(0,7);bm[m]=(bm[m]||0)+t.amt}
+    h+='<div class="card"><h2>By month</h2><table>'+ms.map(m=>'<tr><td>'+monthName(m)+'</td><td class="r">'+fmt(bm[m]||0)+'</td></tr>').join('')+'</table><div class="muted" style="margin-top:6px">Calendar months, so a statement cycle can split across two.</div></div>';
+  }
+  const rev=state.txns.filter(t=>t.cat==='Other'&&!t.manual).length;
+  if(rev)h+='<button class="btn" data-review="1" style="width:100%">'+rev+' transactions still in "Other", review them</button>';
+  el.innerHTML=h;
+}
+
+function filtered(){
+  const f=state.f,q=f.q.trim().toUpperCase();
+  return visible().filter(t=>(!f.card||t.card===f.card)&&(!f.cat||t.cat===f.cat)&&(!f.review||(t.cat==='Other'&&!t.manual))&&(!q||t.desc.toUpperCase().includes(q))).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+}
+function renderTx(){
+  const el=$('#v-tx');
+  if(!state.txns.length){el.innerHTML='<div class="empty">No transactions yet.</div>';return}
+  const cards=[...new Set(state.txns.map(t=>t.card))];
+  let h='<div class="card"><div class="row"><select id="fCard" class="grow"><option value="">All cards</option>'+cards.map(c=>'<option value="'+esc(c)+'"'+(state.f.card===c?' selected':'')+'>'+esc(cardLabel(c))+'</option>').join('')+'</select>'
+  +'<select id="fCat" class="grow"><option value="">All buckets</option>'+CATS.map(c=>'<option'+(state.f.cat===c[0]?' selected':'')+'>'+esc(c[0])+'</option>').join('')+'</select></div>'
+  +'<div class="row" style="margin-top:8px"><input type="text" id="fQ" class="grow" placeholder="Search merchant" value="'+esc(state.f.q)+'"></div>'
+  +'<div class="chips" style="margin:10px 0 0"><span class="chip'+(state.f.review?' on':'')+'" id="fRev">Needs review</span><span class="chip'+(state.applySimilar?' on':'')+'" id="fSim">Apply to similar merchants</span></div></div>'
+  +'<div class="card" id="txList"></div>';
+  el.innerHTML=h;
+  renderTxList();
+}
+function renderTxList(){
+  const el=$('#txList');if(!el)return;
+  const list=filtered();
+  let h='<div class="muted" style="margin-bottom:6px">'+list.length+' transactions</div>';
+  for(const t of list.slice(0,state.limit)){
+    h+='<div class="tx"><div class="grow"><div class="d">'+esc(t.desc)+'</div><div class="m">'+t.date+' · '+esc(cardLabel(t.card))+(t.cr?' · credit':'')+'</div></div><div class="r"><div class="a'+(t.cr?' cr':'')+'">'+(t.cr?'−':'')+fmt2(t.amt)+'</div><select data-id="'+t.id+'">'+CATS.map(c=>'<option'+(c[0]===t.cat?' selected':'')+'>'+esc(c[0])+'</option>').join('')+'</select></div></div>';
+  }
+  if(list.length>state.limit)h+='<button class="btn" id="more" style="width:100%;margin-top:8px">Show more</button>';
+  el.innerHTML=h;
+}
+
+function renderSetup(){
+  const el=$('#v-setup');
+  let h='<div class="card"><h2>Monthly budgets</h2><div class="bgrid">';
+  for(const [c] of CATS){if(c==='Ignore')continue;h+='<label for="b_'+esc(c)+'">'+esc(c)+'</label><input type="number" inputmode="numeric" min="0" id="b_'+esc(c)+'" data-b="'+esc(c)+'" placeholder="₹ / month" value="'+(store.budgets[c]||'')+'">'}
+  h+='</div><div class="muted" style="margin-top:8px">With "All months" selected, budgets scale by the number of months in your data.</div></div>';
+  h+='<div class="card"><h2>Your rules ('+store.rules.length+')</h2>';
+  if(!store.rules.length)h+='<div class="muted">When you change a transaction\'s bucket, the merchant is remembered here and applied to future statements.</div>';
+  for(let i=0;i<store.rules.length;i++){const r=store.rules[i];h+='<div class="row" style="padding:5px 0"><span class="grow">'+esc(r.key)+' → <b>'+esc(r.category)+'</b></span><button class="btn sm" data-delrule="'+i+'">Remove</button></div>'}
+  h+='</div>';
+  h+='<div class="card"><h2>Export</h2><div class="row"><button class="btn pri" id="expCsv">Download CSV</button><button class="btn" id="copyCsv">Copy CSV</button></div><textarea id="csvBox" class="hide" readonly style="margin-top:8px"></textarea></div>';
+  h+='<div class="card"><h2>Back up settings</h2><div class="muted" style="margin-bottom:8px">Budgets, rules and card names. Statement data is never saved.</div><div class="row"><button class="btn" id="copySet">Copy settings</button><button class="btn" id="dlSet">Download</button></div><textarea id="setBox" placeholder="Paste settings here to restore" style="margin-top:8px"></textarea><button class="btn" id="impSet" style="margin-top:6px">Restore</button></div>';
+  el.innerHTML=h;
+}
+
+/* ---------- actions ---------- */
+function setCat(id,cat){
+  const t=state.txns.find(x=>x.id===id);if(!t)return;
+  t.cat=cat;t.manual=true;
+  if(state.applySimilar&&cat!=='Ignore'){
+    const k=merchantKey(t.desc);
+    if(k){
+      store.rules=store.rules.filter(r=>r.key!==k);store.rules.push({key:k,category:cat});save();
+      let n=0;
+      for(const o of state.txns){if(o.id!==t.id&&!o.manual&&o.cr===t.cr&&o.desc.toUpperCase().includes(k)){o.cat=cat;n++}}
+      if(n)toast(n+' similar updated');
+    }
+  }
+  renderSummary();renderTxList();renderSetup();
+}
+function csvText(){
+  const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+  const rows=[['Date','Card','Description','Amount','Type','Bucket','Group']];
+  for(const t of state.txns.slice().sort((a,b)=>a.date.localeCompare(b.date)))rows.push([t.date,cardLabel(t.card),t.desc,t.amt.toFixed(2),t.cr?'credit':'debit',t.cat,BUCKET[t.cat]||'']);
+  return rows.map(r=>r.map(q).join(',')).join('\n');
+}
+async function saveFile(name,data){
+  const type=name.endsWith('.csv')?'text/csv':'application/json';
+  const blob=new Blob([data],{type});
+  try{
+    const file=new File([blob],name,{type});
+    if(/Android|iPhone|iPad/i.test(navigator.userAgent)&&navigator.canShare&&navigator.canShare({files:[file]})){
+      await navigator.share({files:[file],title:name});return true;
+    }
+  }catch(e){if(e&&e.name==='AbortError')return true}
+  try{
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+    document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);return true;
+  }catch(e){return false}
+}
+async function copyText(s,box){
+  try{await navigator.clipboard.writeText(s);toast('Copied');return}catch(e){}
+  if(box){box.classList.remove('hide');box.value=s;box.select();toast('Select all and copy')}
+}
+
+document.addEventListener('click',async e=>{
+  const t=e.target.closest('button,[data-cat],.chip');if(!t)return;
+  if(t.dataset.tab){state.tab=t.dataset.tab;showTab();window.scrollTo(0,0);return}
+  if(t.dataset.go){state.tab=t.dataset.go;showTab();return}
+  if(t.dataset.cat){state.f={card:'',cat:t.dataset.cat,q:'',review:false};state.limit=100;state.tab='tx';renderTx();showTab();return}
+  if(t.dataset.review){state.f={card:'',cat:'',q:'',review:true};state.limit=100;state.tab='tx';renderTx();showTab();return}
+  if(t.id==='fRev'){state.f.review=!state.f.review;renderTx();return}
+  if(t.id==='fSim'){state.applySimilar=!state.applySimilar;renderTx();return}
+  if(t.id==='more'){state.limit+=100;renderTxList();return}
+  if(t.id==='clearAll'){state.txns=[];state.files=[];state.month='all';renderAll();state.tab='upload';showTab();return}
+  if(t.dataset.delrule!==undefined){store.rules.splice(+t.dataset.delrule,1);save();renderSetup();return}
+  if(t.id==='expCsv'){if(!(await saveFile('card-spends.csv',csvText()))){await copyText(csvText(),$('#csvBox'))}return}
+  if(t.id==='copyCsv'){copyText(csvText(),$('#csvBox'));return}
+  if(t.id==='copySet'){copyText(JSON.stringify(store),$('#setBox'));return}
+  if(t.id==='dlSet'){if(!(await saveFile('card-buckets-settings.json',JSON.stringify(store,null,1)))){copyText(JSON.stringify(store),$('#setBox'))}return}
+  if(t.id==='impSet'){
+    try{const o=JSON.parse($('#setBox').value);store={rules:Array.isArray(o.rules)?o.rules.filter(r=>r&&typeof r.key==='string'&&BUCKET[r.category]):[],budgets:o.budgets&&typeof o.budgets==='object'?o.budgets:{},cardNames:o.cardNames&&typeof o.cardNames==='object'?o.cardNames:{}};save();renderAll();toast('Settings restored')}catch(err){toast('That did not look like valid settings')}
+  }
+});
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.id==='fileIn'){const l=[...t.files];t.value='';if(l.length)handleFiles(l);return}
+  if(t.dataset.id){setCat(+t.dataset.id,t.value);return}
+  if(t.id==='monthSel'){state.month=t.value;renderSummary();renderTx();return}
+  if(t.id==='fCard'){state.f.card=t.value;renderTxList();return}
+  if(t.id==='fCat'){state.f.cat=t.value;renderTxList();return}
+});
+document.addEventListener('input',e=>{
+  const t=e.target;
+  if(t.id==='fQ'){state.f.q=t.value;renderTxList();return}
+  if(t.dataset.b!==undefined){const v=parseFloat(t.value);if(v>0)store.budgets[t.dataset.b]=v;else delete store.budgets[t.dataset.b];save();renderSummary();return}
+  if(t.dataset.card!==undefined){const v=t.value.trim();if(v)store.cardNames[t.dataset.card]=v;else delete store.cardNames[t.dataset.card];save();renderSummary();renderTx();renderSetup()}
+});
+const drop=$('#drop');
+['dragenter','dragover'].forEach(n=>drop.addEventListener(n,e=>{e.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(n=>drop.addEventListener(n,e=>{e.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop',e=>{const l=[...(e.dataTransfer.files||[])].filter(f=>/pdf$/i.test(f.name)||f.type==='application/pdf');if(l.length)handleFiles(l)});
+
+renderAll();
+
+/* ---------- PWA: offline + files shared from other apps (Android) ---------- */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+  navigator.serviceWorker.addEventListener('controllerchange',()=>toast('App updated. Reopen to use the new version.'));
+}
+(async()=>{
+  if(!/[?&]shared=1/.test(location.search)||!('caches' in window))return;
+  history.replaceState(null,'',location.pathname);
+  try{
+    const c=await caches.open('shared-files');const keys=await c.keys();const files=[];
+    for(const k of keys){const res=await c.match(k);const b=await res.blob();files.push(new File([b],decodeURIComponent(res.headers.get('X-Name')||'statement.pdf'),{type:'application/pdf'}));await c.delete(k)}
+    if(files.length)handleFiles(files);
+  }catch(e){}
+})();
+})();
+</script>
+</body>
+</html>
