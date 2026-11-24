@@ -182,6 +182,23 @@ tr[data-cardgo]:active,tr[data-persongo]:active,.cat:active{opacity:.6}
 .pk-opt.on .pk-tick{opacity:1}
 body.noscroll{overflow:hidden}
 @media(min-width:700px){.sheet{align-items:center}.sheet-box{border-radius:24px;border-bottom:1px solid var(--line);max-height:70vh}}
+.paybar{display:flex;justify-content:space-between;align-items:flex-end;gap:10px}
+.paybar .mid{margin-top:4px}.paybar .mid.done{color:var(--pos)}
+.due{align-items:flex-start}
+.due .amt{padding-top:2px}
+.due.paid .amt{text-decoration:line-through;color:var(--muted);font-weight:500}
+.due.paid .grow>div:first-child{color:var(--muted)}
+.due .cal.ok{display:grid;place-items:center;height:46px;background:var(--pos-soft);border-color:transparent}
+.due .cal.ok svg{width:22px;height:22px;stroke:var(--pos);fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.due .when.paidtxt{color:var(--pos);font-weight:600}
+.chk{display:inline-flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;font-weight:600;color:var(--fg);cursor:pointer;user-select:none;-webkit-user-select:none;padding:4px 10px 4px 4px;border-radius:10px;border:1px solid var(--line);background:var(--card2)}
+.chk input{position:absolute;opacity:0;width:0;height:0}
+.chk .box{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--faint);display:grid;place-items:center;transition:.15s}
+.chk .box svg{width:14px;height:14px;stroke:var(--acc-fg);fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0}
+.chk input:checked+.box{background:var(--pos);border-color:var(--pos)}
+.chk input:checked+.box svg{opacity:1;stroke:#fff}
+.chk input:focus-visible+.box{outline:2px solid var(--gold);outline-offset:2px}
+.due.paid .chk{color:var(--pos);background:var(--pos-soft);border-color:transparent}
 @media(max-width:380px){.big{font-size:38px}.stat .v{font-size:17px}}
 </style>
 </head>
@@ -189,7 +206,7 @@ body.noscroll{overflow:hidden}
 <div id="app">
   <header class="top">
     <div><div class="brand">Kharcha<i>.</i></div><p class="sub0" id="subline">Credit card spends, sorted</p></div>
-    <span class="pill"><span class="dot"></span>On-device <span id="ver">v9</span></span>
+    <span class="pill"><span class="dot"></span>On-device <span id="ver">v10</span></span>
   </header>
 
   <section id="v-upload">
@@ -623,21 +640,30 @@ const PALETTE=['#C9A15E','#5E9C82','#7D93CF','#D47E69','#A98BCF','#D9B04A','#5AA
 function catColor(c){if(c==='Other')return 'var(--faint)';const i=catNames().indexOf(c);return PALETTE[(i<0?0:i)%PALETTE.length]}
 function money(n){const neg=n<0;n=Math.abs(n);const r=Math.floor(n),p=Math.round((n-r)*100);const rr=p===100?r+1:r,pp=p===100?0:p;return(neg?'−':'')+'₹'+rr.toLocaleString('en-IN')+'<span class="dec">.'+String(pp).padStart(2,'0')+'</span>'}
 function daysTo(iso){const d=new Date(iso+'T00:00:00'),t=new Date();t.setHours(0,0,0,0);return Math.round((d-t)/864e5)}
+function duesGroups(cyc){
+  const fs=state.files.filter(f=>f.status==='ok'&&f.cyc===cyc&&(f.dueDate||fileDue(f)!=null));
+  const by={};
+  for(const f of fs){const k=cardLabel(f.cardKey);const o=by[k]=by[k]||{amt:0,date:null,paid:true,paidAt:null};const d=fileDue(f);if(d!=null)o.amt+=d;if(f.dueDate&&(!o.date||f.dueDate<o.date))o.date=f.dueDate;if(!f.paid)o.paid=false;else if(f.paidAt&&(!o.paidAt||f.paidAt>o.paidAt))o.paidAt=f.paidAt}
+  return Object.entries(by).sort((a,b)=>(a[1].paid-b[1].paid)||((a[1].date||'9')<(b[1].date||'9')?-1:1));
+}
+const todayIso=()=>{const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
 function duesCard(){
   const ms=months();const cyc=state.month==='all'?ms[0]:state.month;
-  const fs=state.files.filter(f=>f.status==='ok'&&f.cyc===cyc&&(f.dueDate||fileDue(f)!=null));
-  if(!fs.length)return '';
-  const by={};
-  for(const f of fs){const k=cardLabel(f.cardKey);const o=by[k]=by[k]||{amt:0,date:null};const d=fileDue(f);if(d!=null)o.amt+=d;if(f.dueDate&&(!o.date||f.dueDate<o.date))o.date=f.dueDate}
-  const rows=Object.entries(by).sort((a,b)=>(a[1].date||'9')<(b[1].date||'9')?-1:1);
-  const total=rows.reduce((s,[,o])=>s+o.amt,0);
-  let h='<div class="card"><div class="sec"><h2>Payments due · '+esc(monthName(cyc))+'</h2><span class="muted">'+fmt(total)+'</span></div>';
+  const rows=duesGroups(cyc);
+  if(!rows.length)return '';
+  const total=rows.reduce((s,[,o])=>s+o.amt,0),paid=rows.reduce((s,[,o])=>s+(o.paid?o.amt:0),0),left=total-paid;
+  const nPaid=rows.filter(([,o])=>o.paid).length;
+  let h='<div class="card"><div class="sec"><h2>Payments due · '+esc(monthName(cyc))+'</h2><span class="muted">'+nPaid+' of '+rows.length+' paid</span></div>';
+  h+='<div class="paybar"><div><div class="eyebrow">Left to pay</div><div class="mid'+(left<0.5?' done':'')+'">'+(left<0.5?'All paid':fmt2(left))+'</div></div><div style="text-align:right"><div class="eyebrow">Paid</div><div class="muted" style="font-weight:600;font-size:14px;margin-top:4px">'+fmt(paid)+' of '+fmt(total)+'</div></div></div>';
+  h+='<div class="bar" style="margin:10px 0 16px"><i style="background:var(--pos);width:'+(total>0?paid/total*100:0).toFixed(1)+'%"></i></div>';
   for(const [k,o] of rows){
-    let cal='<div class="cal"><b>–</b><span>date</span></div>',when='Due date not read yet. Add this statement again';
+    let cal='<div class="cal"><b>–</b><span>date</span></div>',when='<span class="when">Due date not read yet. Add this statement again</span>';
     if(o.date){const dt=new Date(o.date+'T00:00:00');const n=daysTo(o.date);
       cal='<div class="cal"><b>'+dt.getDate()+'</b><span>'+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()]+'</span></div>';
       when='<span class="when'+(n<0?' late':n<=3?' soon':'')+'">'+(n<0?'Was due '+(-n)+' day'+(n===-1?'':'s')+' ago':n===0?'Due today':n===1?'Due tomorrow':'Due in '+n+' days')+'</span>'}
-    h+='<div class="due">'+cal+'<div class="grow"><div style="font-weight:600">'+esc(k)+'</div>'+when+'</div><div class="amt">'+fmt2(o.amt)+'</div></div>';
+    if(o.paid){cal='<div class="cal ok"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>';when='<span class="when paidtxt">Paid'+(o.paidAt?' on '+shortDate(o.paidAt):'')+(o.date?' · was due '+shortDate(o.date):'')+'</span>'}
+    h+='<div class="due'+(o.paid?' paid':'')+'">'+cal+'<div class="grow"><div style="font-weight:600">'+esc(k)+'</div>'+when
+      +'<label class="chk"><input type="checkbox" data-paid="'+esc(k)+'" data-cyc="'+esc(cyc)+'"'+(o.paid?' checked':'')+'><span class="box"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>'+(o.paid?'Paid':'Mark as paid')+'</label></div><div class="amt">'+fmt2(o.amt)+'</div></div>';
   }
   return h+'</div>';
 }
@@ -684,6 +710,7 @@ function summaryText(){
   const a=analysis();
   const L=['Kharcha · '+periodLabel(),'Total spend: '+fmt(a.total)+' ('+a.n+' transactions, '+a.cards.length+' cards)','Needs '+fmt(a.grp.Needs)+' ('+pct(a.grp.Needs,a.total)+'%) · Wants '+fmt(a.grp.Wants)+' ('+pct(a.grp.Wants,a.total)+'%) · Other '+fmt(a.grp.Other)+' ('+pct(a.grp.Other,a.total)+'%)','','By category'];
   for(const r of a.cats)L.push('• '+r.c+': '+fmt(r.v)+' ('+pct(r.v,a.total)+'%)'+(r.b>0?(r.v>r.b?' · '+fmt(r.v-r.b)+' over budget':' · '+fmt(r.b-r.v)+' under budget'):''));
+  {const ms=months();const cyc=state.month==='all'?ms[0]:state.month;const dg=duesGroups(cyc);if(dg.length){L.push('','Payments due');for(const [k,o] of dg)L.push('• '+k+': '+fmt2(o.amt)+(o.date?' · '+shortDate(o.date):'')+(o.paid?' · PAID':''));const left=dg.reduce((s,[,o])=>s+(o.paid?0:o.amt),0);L.push('Left to pay: '+fmt2(left))}}
   L.push('','By card');for(const [k,c] of a.cards)L.push('• '+k+': '+fmt(c.v));
   if(store.people.length){L.push('','By person');for(const [k,c] of a.people)L.push('• '+k+': '+fmt(c.v)+' ('+pct(c.v,a.total)+'%)')}
   const d=trendData();if(d.cycles.length>1){L.push('','Trends ('+shortMon(d.last)+' vs '+shortMon(d.prev)+')');for(const r of d.rows.slice(0,6))L.push('• '+r.c+': '+fmt(r.last)+(r.pct===null?' (new)':' ('+(r.pct>0?'+':'')+r.pct+'%)'))}
@@ -808,11 +835,10 @@ async function buildPdf(){
   const dfs=state.files.filter(f=>f.status==='ok'&&f.cyc===cyc&&(f.dueDate||fileDue(f)!=null));
   if(dfs.length){
     section('Payments due · '+monthName(cyc));
-    const by={};for(const f of dfs){const k=cardLabel(f.cardKey);const o=by[k]=by[k]||{amt:0,date:null};const d=fileDue(f);if(d!=null)o.amt+=d;if(f.dueDate&&(!o.date||f.dueDate<o.date))o.date=f.dueDate}
-    const rows=Object.entries(by).sort((p,q)=>(p[1].date||'9')<(q[1].date||'9')?-1:1);
-    const tot=rows.reduce((s,[,o])=>s+o.amt,0);
-    table([{t:'Card',x:M,w:280},{t:'Due date',x:M+290,w:110},{t:'Amount',x:M+400,w:CW-400,r:1}],
-      rows.map(([k,o])=>[k,o.date?new Date(o.date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'–',R2(o.amt)]).concat([[{t:'Total',b:1},'',{t:R2(tot),b:1}]]));
+    const rows=duesGroups(cyc);
+    const tot=rows.reduce((s,[,o])=>s+o.amt,0),left=rows.reduce((s,[,o])=>s+(o.paid?0:o.amt),0);
+    table([{t:'Card',x:M,w:240},{t:'Due date',x:M+245,w:90},{t:'Status',x:M+340,w:80},{t:'Amount',x:M+420,w:CW-420,r:1}],
+      rows.map(([k,o])=>[k,o.date?new Date(o.date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'–',{t:o.paid?'Paid'+(o.paidAt?' '+shortDate(o.paidAt):''):'Due',c:o.paid?GREEN:RED,b:1},R2(o.amt)]).concat([[{t:'Total',b:1},'','',{t:R2(tot),b:1}],[{t:'Left to pay',b:1},'','',{t:R2(left),b:1,c:left>0.5?RED:GREEN}]]));
   }
   // categories
   section('Spend by category');
@@ -1080,6 +1106,7 @@ document.addEventListener('change',e=>{
   if(t.dataset.pid){const x=state.txns.find(o=>o.id===+t.dataset.pid);if(x){if(t.value)x.person=t.value;else delete x.person}saveData();renderSummary();renderTxTotals();if(state.f.person)renderTxList();return}
   if(t.id==='bulkPerson'){const v=t.value;if(!v)return;const list=filtered();for(const x of list){if(v==='__none')delete x.person;else x.person=v}saveData();toast(list.length+' transactions '+(v==='__none'?'cleared':'assigned to '+v));renderSummary();renderTxTotals();renderTxList();return}
   if(t.dataset.catgroup!==undefined){const c=CATS[+t.dataset.catgroup];if(c){c[1]=t.value;store.cats=CATS.filter(x=>x[0]!=='Ignore');loadCats();save();renderSummary()}return}
+  if(t.dataset.paid!==undefined){const on=t.checked;for(const f of state.files){if(f.status==='ok'&&f.cyc===t.dataset.cyc&&cardLabel(f.cardKey)===t.dataset.paid){f.paid=on;if(on)f.paidAt=todayIso();else delete f.paidAt}}saveData();renderSummary();toast(on?t.dataset.paid+' marked as paid':t.dataset.paid+' marked as unpaid');return}
   if(t.dataset.due){const f=state.files.find(o=>o.id===+t.dataset.due);if(f){const v=parseFloat(t.value);f.dueOverride=isNaN(v)?null:v;saveData();renderUpload()}return}
   if(t.id==='monthSel'||t.id==='monthSel2'){state.month=t.value;renderSummary();renderTx();return}
   if(t.id==='fCard'){state.f.card=t.value;renderTxTotals();renderTxList();return}
