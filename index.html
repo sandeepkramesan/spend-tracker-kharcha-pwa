@@ -189,7 +189,7 @@ body.noscroll{overflow:hidden}
 <div id="app">
   <header class="top">
     <div><div class="brand">Kharcha<i>.</i></div><p class="sub0" id="subline">Credit card spends, sorted</p></div>
-    <span class="pill"><span class="dot"></span>On-device <span id="ver">v8</span></span>
+    <span class="pill"><span class="dot"></span>On-device <span id="ver">v9</span></span>
   </header>
 
   <section id="v-upload">
@@ -463,7 +463,7 @@ function markEmiConversions(tx){
     if(d){d.emiPair=c.emiPair=true}
   }
 }
-async function processFile(file,rec){
+async function readStatement(file){
   const buf=new Uint8Array(await file.arrayBuffer());
   const task=pdfjsLib.getDocument({data:buf});
   let tried=0,cancelled=false;
@@ -481,35 +481,55 @@ async function processFile(file,rec){
   const year=+Object.keys(years).sort((a,b)=>years[b]-years[a])[0]||new Date().getFullYear();
   const {tx,skipped,firstTx,isTx}=parseLines(lines,year);
   const head=lines.slice(0,firstTx>0?firstTx:60).join(' ');
-  const card=detectCard(head,lines.slice(0,120).join(' '),rec.id,lines.filter((l,i)=>!isTx.has(i)).join('\n'));
+  const card=detectCard(head,lines.slice(0,120).join(' '),'n'+Date.now(),lines.filter((l,i)=>!isTx.has(i)).join('\n'));
   markEmiConversions(tx);
-  const cardKey=card.key;
-  if(!store.cardNames[cardKey]){store.cardNames[cardKey]=card.name;save()}
-  rec.cardKey=cardKey;rec.skipped=skipped;rec.sample=lines.slice(0,40);rec.pages=pdf.numPages;
-  rec.due=findDue(lines);rec.dueDate=findDueDate(lines);
-  const seen=new Set(state.txns.map(t=>t.sig));
-  let added=0,dup=0;
-  for(const t of tx){
-    const sig=[cardKey,t.date,t.amt,t.desc.toUpperCase().replace(/\s+/g,' ')].join('|');
+  return{card,tx,skipped,sample:lines.slice(0,40),pages:pdf.numPages,due:findDue(lines),dueDate:findDueDate(lines),cyc:tx.reduce((m,t)=>t.date>m?t.date:m,'').slice(0,7)};
+}
+// add a parsed statement's rows to a file record; returns how many were new
+function commitRows(rec,info){
+  const seen=new Set(state.txns.map(t=>t.sig));let added=0,dup=0;
+  for(const t of info.tx){
+    const sig=[rec.cardKey,t.date,t.amt,t.desc.toUpperCase().replace(/\s+/g,' ')].join('|');
     if(seen.has(sig)){dup++;continue}
-    state.txns.push({id:nextId++,fileId:rec.id,sig,card:cardKey,date:t.date,desc:t.desc,amt:t.amt,cr:t.cr,cat:t.emiPair?'Ignore':classify(t.desc,t.cr),emi:!!t.emiPair,manual:false});
+    seen.add(sig);
+    state.txns.push({id:nextId++,fileId:rec.id,sig,card:rec.cardKey,date:t.date,desc:t.desc,amt:t.amt,cr:t.cr,cat:t.emiPair?'Ignore':classify(t.desc,t.cr),emi:!!t.emiPair,manual:false,cyc:info.cyc});
     added++;
   }
-  const cyc=tx.reduce((m,t)=>t.date>m?t.date:m,'').slice(0,7);
-  for(const t of state.txns)if(t.fileId===rec.id)t.cyc=cyc;
-  rec.cyc=cyc;rec.n=added;rec.dup=dup;rec.status='ok';
+  return{added,dup};
 }
 async function handleFiles(list){
   if(!window.pdfjsLib){toast('The PDF reader could not load. Reload the app.');return}
   pdfjsLib.GlobalWorkerOptions.workerSrc='pdf.worker.min.js';
+  let added=0,refreshed=0,failed=0;
   for(const f of list){
-    if(state.files.some(x=>x.name===f.name&&x.size===f.size&&x.status==='ok')){toast(f.name+' is already loaded');continue}
-    const rec={id:nextId++,name:f.name,size:f.size,status:'reading',n:0,dup:0,skipped:[],sample:[]};
-    state.files.push(rec);renderUpload();
-    try{await processFile(f,rec);saveData()}catch(e){rec.status='error';rec.error=(e&&e.message)||String(e)}
+    const tmp={id:nextId++,name:f.name,size:f.size,status:'reading',n:0,dup:0,skipped:[],sample:[]};
+    state.files.push(tmp);renderUpload();
+    try{
+      const info=await readStatement(f);
+      state.files=state.files.filter(x=>x!==tmp);
+      // same statement already loaded? (same file, or same card + same cycle)
+      const old=state.files.find(x=>x.status==='ok'&&((x.name===f.name&&x.size===f.size)||(x.cardKey===info.card.key&&x.cyc===info.cyc)));
+      if(old){
+        Object.assign(old,{due:info.due,dueDate:info.dueDate,skipped:info.skipped,sample:info.sample,pages:info.pages,cyc:info.cyc||old.cyc,name:f.name,size:f.size});
+        const r=commitRows(old,info);old.n=state.txns.filter(t=>t.fileId===old.id).length;old.dup=0;
+        for(const t of state.txns)if(t.fileId===old.id)t.cyc=old.cyc;
+        refreshed++;
+      }else{
+        const rec={id:tmp.id,name:f.name,size:f.size,cardKey:info.card.key,status:'ok',skipped:info.skipped,sample:info.sample,pages:info.pages,due:info.due,dueDate:info.dueDate,cyc:info.cyc};
+        if(!store.cardNames[rec.cardKey]){store.cardNames[rec.cardKey]=info.card.name;save()}
+        const r=commitRows(rec,info);rec.n=r.added;rec.dup=r.dup;
+        state.files.push(rec);added++;
+      }
+      saveData();
+    }catch(e){tmp.status='error';tmp.error=(e&&e.message)||String(e);failed++}
     renderUpload();
   }
-  if(state.txns.length){state.tab='summary';renderAll()}else renderUpload()
+  const msg=[];
+  if(added)msg.push(added+' statement'+(added>1?'s':'')+' added');
+  if(refreshed)msg.push(refreshed===1&&list.length===1?'This statement was already loaded. Details refreshed':refreshed===list.length&&!added?'All '+refreshed+' statements were already loaded. Details refreshed':refreshed+' already loaded, details refreshed');
+  if(failed)msg.push(failed+' couldn\'t be read');
+  if(msg.length)toast(msg.join(' · '));
+  if(state.txns.length){state.tab=added||refreshed?'summary':state.tab;renderAll()}else renderUpload();
 }
 
 /* ---------- derived ---------- */
@@ -544,7 +564,7 @@ function analysis(){
 const pct=(v,t)=>t>0?Math.round(v/t*100):0;
 
 /* ---------- rendering ---------- */
-function toast(msg){const t=$('#toast');t.textContent=msg;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',2800)}
+function toast(msg){const t=$('#toast');t.textContent=msg;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',Math.max(2800,msg.length*70))}
 function showTab(){
   for(const k of['upload','summary','tx','setup']){$('#v-'+k).classList.toggle('hide',state.tab!==k)}
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===state.tab));
@@ -613,7 +633,7 @@ function duesCard(){
   const total=rows.reduce((s,[,o])=>s+o.amt,0);
   let h='<div class="card"><div class="sec"><h2>Payments due · '+esc(monthName(cyc))+'</h2><span class="muted">'+fmt(total)+'</span></div>';
   for(const [k,o] of rows){
-    let cal='<div class="cal"><b>–</b><span>date</span></div>',when='Due date not found';
+    let cal='<div class="cal"><b>–</b><span>date</span></div>',when='Due date not read yet. Add this statement again';
     if(o.date){const dt=new Date(o.date+'T00:00:00');const n=daysTo(o.date);
       cal='<div class="cal"><b>'+dt.getDate()+'</b><span>'+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()]+'</span></div>';
       when='<span class="when'+(n<0?' late':n<=3?' soon':'')+'">'+(n<0?'Was due '+(-n)+' day'+(n===-1?'':'s')+' ago':n===0?'Due today':n===1?'Due tomorrow':'Due in '+n+' days')+'</span>'}
