@@ -222,7 +222,7 @@ input[type=date]{min-height:44px}
 <div id="app">
   <header class="top">
     <div><div class="brand">Kharcha<i>.</i></div><p class="sub0" id="subline">Credit card spends, sorted</p></div>
-    <span class="pill"><span class="dot"></span>On-device <span id="ver">v11</span></span>
+    <span class="pill"><span class="dot"></span>On-device <span id="ver">v13</span></span>
   </header>
 
   <section id="v-upload">
@@ -860,9 +860,17 @@ async function buildPdf(){
   doc.setFillColor(...SOFT);doc.setDrawColor(...LINE);doc.roundedRect(M,y,CW,118,10,10,'FD');
   font('J',8.5,'bold');col(MUTED);doc.text('TOTAL SPEND',M+18,y+24,{charSpace:1.2});
   font('F',34);col(INK);doc.text(R(a.total),M+18,y+62);
-  font('J',9.5);col(MUTED);doc.text(a.n+' transactions across '+a.cards.length+' cards'+(a.ignored?' · '+R(a.ignored)+' of card payments & EMI conversions left out':''),M+18,y+82,{maxWidth:CW-36});
+  {const bt=budgetTotal()*(state.month==='all'?Math.max(1,months().length):1);
+   const bx=W-M-18;
+   font('J',8.5,'bold');col(MUTED);doc.text((state.month==='all'&&months().length>1?'BUDGET ('+months().length+' MONTHS)':'MONTHLY BUDGET'),bx,y+24,{align:'right',charSpace:1.2});
+   if(bt>0){const left=bt-a.total;
+     font('F',22);col(INK);doc.text(R(bt),bx,y+52,{align:'right'});
+     font('J',9.5,'bold');col(left<0?RED:GREEN);doc.text(left<0?R(-left)+' over budget':R(left)+' left',bx,y+68,{align:'right'});
+     const bw=150;doc.setFillColor(...LINE);doc.roundedRect(bx-bw,y+74,bw,4,2,2,'F');doc.setFillColor(...(left<0?RED:GREEN));doc.roundedRect(bx-bw,y+74,Math.max(2,bw*Math.min(1,a.total/bt)),4,2,2,'F');
+   }else{font('J',9.5);col(MUTED);doc.text('Not set',bx,y+48,{align:'right'})}}
+  font('J',9.5);col(MUTED);doc.text(a.n+' transactions · '+a.cards.length+' card'+(a.cards.length===1?'':'s')+(a.ignored?' · card payments not counted':''),M+18,y+82);
   const gw=(CW-36-16)/3;
-  ['Needs','Wants','Other'].forEach((g,i)=>{const x=M+18+i*(gw+8);font('J',8,'bold');col(MUTED);doc.text(g.toUpperCase(),x,y+101,{charSpace:1});font('J',10.5,'bold');col(INK);doc.text(R(a.grp[g])+'  ',x+38,y+101);font('J',9);col(MUTED);doc.text(pct(a.grp[g],a.total)+'%',x+gw-4,y+101,{align:'right'})});
+  ['Needs','Wants','Other'].forEach((g,i)=>{const x=M+18+i*(gw+8);font('J',8,'bold');col(MUTED);doc.text(g.toUpperCase(),x,y+101,{charSpace:1});const lw=doc.getTextWidth(g.toUpperCase())+g.length*1+8;font('J',10.5,'bold');col(INK);const amt=R(a.grp[g]);doc.text(amt,x+lw,y+101);const aw=doc.getTextWidth(amt);font('J',9);col(MUTED);doc.text('('+pct(a.grp[g],a.total)+'%)',x+lw+aw+5,y+101)});
   y+=140;
   // dues
   const ms=months();const cyc=dueCycle();
@@ -1137,7 +1145,10 @@ document.addEventListener('click',async e=>{
     try{
       if(!window.jspdf)await new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='jspdf.umd.min.js';sc.onload=res;sc.onerror=()=>rej(new Error('PDF maker could not load'));document.head.appendChild(sc)});
       const blob=await buildPdf();
-      const nm='kharcha-report-'+(state.month==='all'?(months()[0]||'all'):state.month)+'.pdf';
+      const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const ms=months();const last=state.month==='all'?ms[0]:state.month,first=state.month==='all'?ms[ms.length-1]:state.month;
+      const prevMon=m=>MN[(+m.split('-')[1]+10)%12];
+      const nm=(first&&last?prevMon(first)+'-'+MN[+last.split('-')[1]-1]:'All')+' Spend Report.pdf';
       if(!(await saveFile(nm,blob)))toast('Could not save the PDF here');
     }catch(err){toast('PDF failed: '+((err&&err.message)||err))}
     t.disabled=false;t.textContent=old;return}
