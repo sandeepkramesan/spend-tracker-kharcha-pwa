@@ -92,7 +92,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
 <body>
 <div id="app">
   <h1>Card spend buckets</h1>
-  <p class="sub0">Statements are read on this device. Nothing is uploaded anywhere. <span id="ver">v1</span></p>
+  <p class="sub0">Statements are read on this device. Nothing is uploaded anywhere. <span id="ver">v3</span></p>
   <nav id="nav">
     <button data-tab="upload" class="on">Upload</button>
     <button data-tab="summary">Summary</button>
@@ -145,26 +145,29 @@ function save(){try{localStorage.setItem(LS,JSON.stringify(store))}catch(e){}}
 
 /* ---------- categories ---------- */
 const CATS=[['Groceries','Needs'],['Fuel','Needs'],['Transport','Needs'],['Bills & Utilities','Needs'],['Health','Needs'],['Insurance','Needs'],['Education','Needs'],
-['Dining & Delivery','Wants'],['Shopping','Wants'],['Travel','Wants'],['Entertainment & Subscriptions','Wants'],
-['Fees & Interest','Other'],['Cash & Wallets','Other'],['Other','Other'],['Ignore','Ignore']];
+['Dining & Delivery','Wants'],['Personal Care','Wants'],['Shopping','Wants'],['Travel','Wants'],['Entertainment & Subscriptions','Wants'],
+['EMIs','Other'],['Fees & Interest','Other'],['Cash & Wallets','Other'],['Other','Other'],['Ignore','Ignore']];
 const BUCKET=Object.fromEntries(CATS);
 const RULES=[
-['Fees & Interest',/finance charge|interest charge|late (payment )?(fee|charge)|annual fee|joining fee|membership fee|igst|cgst|sgst|gst @|over ?limit|cash advance fee|emi processing|processing fee|fuel surcharge|convenience fee|service charge|fee reversal/i],
+['Fees & Interest',/procng fee|finance charge|interest charge|late (payment )?(fee|charge)|annual fee|joining fee|membership fee|igst|cgst|sgst|gst @|over ?limit|cash advance fee|emi processing|processing fee|fuel surcharge|convenience fee|service charge|fee reversal/i],
+['EMIs',/offus emi|emi ?,\s?(prin|int)|mer emi|emi principal|emi interest|emi instal/i],
 ['Cash & Wallets',/\batm\b|cash withdrawal|cash advance|wallet|add money|mobikwik|freecharge|upi lite/i],
 ['Insurance',/insurance|\blic\b|lic of india|hdfc life|icici pru|sbi life|max life|star health|care health|niva bupa|policybazaar|\backo\b|\bdigit\b|bajaj allianz|tata aig/i],
-['Groceries',/bigbasket|big basket|blinkit|grofers|zepto|instamart|dmart|d-mart|avenue supermarts|reliance (fresh|smart|retail)|more retail|spencer|nature'?s basket|jiomart|country delight|licious|fresh ?to ?home|milkbasket|supermarket|kirana|grocer|star bazaar|vegetable|fruits/i],
-['Dining & Delivery',/swiggy|zomato|eatsure|domino|pizza|mcdonald|\bkfc\b|burger|starbucks|cafe|coffee|restaurant|bakery|barbeque|biryani|haldiram|subway|chaayos|dunzo|dining|kitchen|brewing|\bpub\b|eatery|dhaba|food|sweets/i],
+['Groceries',/hypermarket|lulu|milma|supply ?co|bakery ?mart|provision|dairy|bigbasket|big basket|blinkit|grofers|zepto|instamart|dmart|d-mart|avenue supermarts|reliance (fresh|smart|retail)|more retail|spencer|nature'?s basket|jiomart|country delight|licious|fresh ?to ?home|milkbasket|supermarket|kirana|grocer|star bazaar|vegetable|fruits/i],
+['Dining & Delivery',/rebel (market|foods)|faasos|vada ?pav|pan shop|catering|\bstall\b|cake|culinary|juice|tea ?stall|chai|hotel .*(veg|restaurant)|swiggy|zomato|eatsure|domino|pizza|mcdonald|\bkfc\b|burger|starbucks|cafe|coffee|restaurant|bakery|barbeque|biryani|haldiram|subway|chaayos|dunzo|dining|kitchen|brewing|\bpub\b|eatery|dhaba|food|sweets/i],
 ['Fuel',/hpcl|bpcl|iocl|indian ?oil|bharat petroleum|hindustan petroleum|\bshell\b|reliance bp|jio-?bp|nayara|petrol|fuel|filling station|essar/i],
-['Travel',/irctc|makemytrip|\bmmt\b|goibibo|cleartrip|ixigo|yatra|indigo|interglobe|air ?india|vistara|akasa|spicejet|air ?asia|emirates|booking\.com|agoda|airbnb|\boyo\b|taj hotel|marriott|hyatt|treebo|fabhotel|redbus|abhibus|lounge|travel|hotel|resort|\bihg\b|lemon tree|airlines/i],
+['Travel',/indian ?railway|railway|ibibo|irctc|makemytrip|\bmmt\b|goibibo|cleartrip|ixigo|yatra|indigo|interglobe|air ?india|vistara|akasa|spicejet|air ?asia|emirates|booking\.com|agoda|airbnb|\boyo\b|taj hotel|marriott|hyatt|treebo|fabhotel|redbus|abhibus|lounge|travel|hotel|resort|\bihg\b|lemon tree|airlines/i],
 ['Transport',/\buber\b|\bola\b|olacabs|rapido|meru|fastag|nhai|metro|dmrc|bmtc|parking|\btoll\b|namma|yulu|blusmart/i],
-['Entertainment & Subscriptions',/netflix|hotstar|disney|prime video|spotify|youtube|google ?(play|one|storage)|apple\.com\/bill|apple ?services|itunes|icloud|bookmyshow|\bpvr\b|\binox\b|cinepolis|sonyliv|zee5|jiocinema|audible|kindle|steam|playstation|xbox|nintendo|linkedin|openai|chatgpt|anthropic|claude\.ai|github|dropbox|notion|canva|adobe|microsoft|gaana|wynk|dream11|\bmpl\b|gaming|wonderla|imagica/i],
+['Entertainment & Subscriptions',/godaddy|google ?play|playstore|netflix|hotstar|disney|prime video|spotify|youtube|google ?(play|one|storage)|apple\.com\/bill|apple ?services|itunes|icloud|bookmyshow|\bpvr\b|\binox\b|cinepolis|sonyliv|zee5|jiocinema|audible|kindle|steam|playstation|xbox|nintendo|linkedin|openai|chatgpt|anthropic|claude\.ai|github|dropbox|notion|canva|adobe|microsoft|gaana|wynk|dream11|\bmpl\b|gaming|wonderla|imagica/i],
 ['Bills & Utilities',/\bjio\b|reliance jio|airtel|vodafone|\bvi\b|bsnl|act fibernet|hathway|tata ?(sky|play)|dish ?tv|bescom|msedcl|tata power|adani (electricity|gas)|\bbses\b|mahanagar gas|indraprastha|\bigl\b|electricity|broadband|water bill|gas bill|piped gas|bharat ?bill|bbps|billdesk|\bcred\b|\brent\b|society|maintenance|recharge|\bdth\b|municipal|property tax|income tax|nobroker/i],
-['Health',/apollo|pharm|medplus|1mg|netmeds|practo|hospital|clinic|diagnostic|\blab\b|thyrocare|lal path|pathology|medical|dental|doctor|healthians|cult\.?fit|gym|fitness|wellness|optical|manipal|fortis|medanta|health/i],
+['Health',/pathlab|agilus|healthkart|hospital|apollo|pharm|medplus|1mg|netmeds|practo|hospital|clinic|diagnostic|\blab\b|thyrocare|lal path|pathology|medical|dental|doctor|healthians|cult\.?fit|gym|fitness|wellness|optical|manipal|fortis|medanta|health/i],
 ['Education',/school|college|university|tuition|coursera|udemy|byju|unacademy|upgrad|vedantu|academy|institute|\bexam\b|crossword|skillshare|duolingo/i],
-['Shopping',/amazon|amzn|flipkart|myntra|ajio|nykaa|meesho|tata ?cliq|reliance digital|croma|vijay sales|ikea|decathlon|lifestyle|westside|pantaloons|max fashion|shoppers stop|zara|h&m|uniqlo|lenskart|firstcry|pepperfry|urban ladder|\bbata\b|titan|tanishq|apple store|samsung|oneplus|fashion|\bmall\b|retail|store|\bmart\b/i]
+['Personal Care',/salon|parlou?r|\bspa\b|barber|unisex|sephora|nykaa|lakme|naturals|cosmetic/i],
+['Shopping',/gyftr|smartbuy|gift ?card|voucher|victoria'?s? secret|zudio|trent|book|handicraft|computer|electronics|mobiles?\b|amazon|amzn|flipkart|myntra|ajio|nykaa|meesho|tata ?cliq|reliance digital|croma|vijay sales|ikea|decathlon|lifestyle|westside|pantaloons|max fashion|shoppers stop|zara|h&m|uniqlo|lenskart|firstcry|pepperfry|urban ladder|\bbata\b|titan|tanishq|apple store|samsung|oneplus|fashion|\bmall\b|retail|store|\bmart\b/i]
 ];
-const PAYMENT=/payment|thank you|autopay|auto debit|neft|imps|\bupi\b|bbps|repay|received|billdesk|cc ?pay|netbanking|net banking|ecs|nach/i;
-const STOP=new Set('UPI POS PURCHASE PAYMENT ONLINE THE AND FOR PVT LTD LIMITED INDIA IND IN MUMBAI BANGALORE BENGALURU DELHI NEW GURGAON GURUGRAM HYDERABAD CHENNAI PUNE KOLKATA NOIDA THANE WWW COM HTTPS TECHNOLOGIES SERVICES RETAIL'.split(' '));
+const STRONG_PAY=/payment received|payment recd|thank you|autopay|auto ?debit|si payment|bbps payment|infinity payment|netbanking payment|net banking payment|online payment|cc payment|card payment|payment[\s-]*(neft|imps|upi|bbps|ib)|(neft|imps|upi|bbps)[\s-]*payment|repayment/i;
+const PAYMENT=/payment|pymt|paymt|thank you|autopay|auto debit|neft|imps|\bupi\b|bbps|repay|received|billdesk|cc ?pay|netbanking|net banking|ecs|nach/i;
+const STOP=new Set('EMI PAY PTM RAZ EAS IIL MER UPI POS PURCHASE PAYMENT ONLINE THE AND FOR PVT LTD LIMITED INDIA IND IN MUMBAI BANGALORE BENGALURU DELHI NEW GURGAON GURUGRAM HYDERABAD CHENNAI PUNE KOLKATA NOIDA THANE WWW COM HTTPS TECHNOLOGIES SERVICES RETAIL'.split(' '));
 
 function merchantKey(desc){
   const w=desc.toUpperCase().replace(/[^A-Z ]+/g,' ').split(/\s+/).filter(x=>x.length>=3&&!STOP.has(x));
@@ -173,17 +176,19 @@ function merchantKey(desc){
 }
 function classify(desc,isCredit){
   const u=desc.toUpperCase();
-  if(isCredit&&PAYMENT.test(desc))return 'Ignore';
+  if(STRONG_PAY.test(desc)||(isCredit&&PAYMENT.test(desc)))return 'Ignore';
   for(let i=store.rules.length-1;i>=0;i--){const r=store.rules[i];if(u.includes(r.key))return r.category}
-  for(const [c,re] of RULES){if(re.test(desc))return c}
+  const compact=desc.replace(/\s+/g,'');
+  for(const [c,re] of RULES){if(re.test(desc)||re.test(compact))return c}
   return 'Other';
 }
 
 /* ---------- state ---------- */
-const state={tab:'upload',month:'all',txns:[],files:[],applySimilar:true,f:{card:'',cat:'',q:'',review:false},limit:100};
+const state={tab:'upload',month:'all',txns:[],files:[],applySimilar:true,f:{card:'',cat:'',q:'',review:false,file:0},limit:100};
 let nextId=1;
 const pwCache=[];
 const cardLabel=k=>store.cardNames[k]||k.replace('|',' ••');
+const sameCard=(t,label)=>cardLabel(t.card)===label;
 
 /* ---------- PDF reading ---------- */
 function askPassword(name,wrong){
@@ -226,35 +231,96 @@ function parseDate(line,year){
   if(m&&year&&MON[m[2].toLowerCase()])return mk(year,MON[m[2].toLowerCase()],+m[1],m[0].length);
   return null;
 }
-const AMT=/(-?\d[\d,]*\.\d{2})(?:\s?(CR|DR|Cr|Dr|cr|dr|C|D)(?![A-Za-z]))?/g;
+const AMT=/(\+\s*|-)?(?:(?:₹|Rs\.?|INR|`|(?<![A-Za-z])C)\s?)?(\d{1,3}(?:,\d{2,3})+\.\d{2}|\d+\.\d{2})(?:\s?(CR|DR|Cr|Dr|cr|dr|C|D)(?![A-Za-z]))?/g;
+const FX=/\b(USD|EUR|GBP|AED|SGD|JPY|AUD|CAD|CHF|THB|MYR|HKD|SAR|QAR|CNY|NZD|LKR|IDR|VND)\s*$/i;
 const DATEANY=/\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}|\d{1,2}\s[A-Za-z]{3}\s?\d{2,4}/;
+const amtVal=m=>parseFloat(m[2].replace(/,/g,''));
 function parseLines(lines,year){
-  const tx=[],skipped=[];
-  for(const line of lines){
+  const tx=[],skipped=[];let firstTx=-1;
+  const isTx=new Set();
+  lines.forEach((line0,idx)=>{
+    const line=line0.replace(/^.*?\d{1,3}%\s+(?=\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}\s)/,'');
     const d=parseDate(line,year);
-    if(!d){if(skipped.length<20&&DATEANY.test(line)&&/\d\.\d{2}/.test(line))skipped.push(line);continue}
-    let rest=line.slice(d.len).replace(/^\s*[|,]?\s*\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM)?/i,'').trim();
-    const ms=[...rest.matchAll(AMT)];
-    if(!ms.length){if(skipped.length<20&&/\d/.test(rest))skipped.push(line);continue}
-    const last=ms[ms.length-1];
-    let desc=rest.slice(0,ms[0].index).trim();
-    if(desc.length<3)desc=rest.replace(AMT,' ').replace(/\s+/g,' ').trim();
-    desc=desc.replace(/^\d{6,}\s+/,'').replace(/[\s|]+$/,'');
-    if(desc.length<2||!/[A-Za-z]/.test(desc))continue;
-    if(/^(total|opening|closing|previous|statement|payment due|minimum|credit limit|available|reward)/i.test(desc))continue;
-    const v=parseFloat(last[1].replace(/[,-]/g,''));
-    if(!v)continue;
-    const cr=!!(last[1].startsWith('-')||(last[2]&&/^c/i.test(last[2])));
+    if(!d){if(skipped.length<25&&DATEANY.test(line)&&/\d\.\d{2}/.test(line)&&!/months|statement|due date/i.test(line))skipped.push(line);return}
+    let rest=line.slice(d.len).replace(/^\s*[|,]?\s*\d{1,2}:\d{2}(:\d{2})?(\s*(AM|PM)\b)?/i,'').trim();
+    const all=[...rest.matchAll(AMT)];
+    // skip foreign-currency amounts (ICICI/HDFC show "USD 20.00" before the INR amount)
+    const ms=all.filter(m=>!FX.test(rest.slice(0,m.index)));
+    if(!ms.length){if(skipped.length<25&&/\d/.test(rest))skipped.push(line);return}
+    // the INR amount is the first remaining one; later ones are cashback / reward / balance columns
+    const pick=ms[0];
+    let desc=rest.slice(0,all[0].index).trim();
+    if(desc.length<3){
+      const parts=[];const prev=lines[idx-1],next=lines[idx+1];
+      if(prev&&!isTx.has(idx-1)&&!parseDate(prev,year)&&!/transaction|date|amount/i.test(prev)&&!AMT.test(prev))parts.push(prev);
+      AMT.lastIndex=0;
+      if(next&&!parseDate(next,year)&&next.length<90&&!/^page|end of|total|^#/i.test(next)&&!AMT.test(next))parts.push(next);
+      AMT.lastIndex=0;
+      desc=parts.join(' ')||rest.replace(AMT,' ').replace(/\s+/g,' ').trim();
+    }
+    desc=desc.replace(/\(Ref#[^)]*\)?/g,'').replace(/^UPI-\d+-/i,'').replace(/\s+IN$/,'').replace(/\s+/g,' ').trim();
+    desc=desc.replace(/^\d{6,}\s+/,'').replace(FX,'').replace(/(\s+[+\-]?\d{1,5})+\s*$/,'').replace(/[\s|+\-]+$/,'').trim();
+    if(desc.length<2||!/[A-Za-z]/.test(desc))return;
+    if(/^(total|opening|closing|previous|statement|payment due|minimum|credit limit|available|reward|points|cashback earned|amount due)/i.test(desc))return;
+    const v=amtVal(pick);
+    if(!v)return;
+    const sign=(pick[1]||'').trim(),suf=pick[3]||'';
+    const word=(rest.slice(pick.index+pick[0].length).match(/^\s*(credit|debit)\b/i)||[])[1]||'';
+    let cr;
+    if(/^c/i.test(suf)||/^credit/i.test(word))cr=true;else if(/^d/i.test(suf)||/^debit/i.test(word))cr=false;
+    else cr=sign==='+'||sign==='-'||/\brefund|reversal|reversed|cashback credit/i.test(desc);
+    if(firstTx<0)firstTx=idx;
+    isTx.add(idx);
     tx.push({date:d.iso,desc,amt:cr?-v:v,cr});
+  });
+  return{tx,skipped,firstTx,isTx};
+}
+function findDue(lines){
+  for(let i=0;i<lines.length;i++){
+    const L=lines[i];
+    const m=L.match(/total\s*(amount\s*|payment\s*)?dues?\b|total\s*(amount|payment)\s*due/i);
+    if(!m)continue;
+    const after=L.slice(m.index+m[0].length);
+    let a=[...after.matchAll(AMT)];
+    if(a.length)return amtVal(a[0]);
+    const labelLast=!/[A-Za-z]{3,}/.test(after.replace(/\b(rs|inr)\b/ig,''));
+    for(let j=i+1;j<Math.min(lines.length,i+6);j++){
+      const eq=lines[j].lastIndexOf('=');
+      if(eq>=0){const b=[...lines[j].slice(eq).matchAll(AMT)];if(b.length)return amtVal(b[0])}
+      a=[...lines[j].matchAll(AMT)];if(a.length)return amtVal(labelLast?a[a.length-1]:a[0])}
   }
-  return{tx,skipped};
+  return null;
 }
 const BANKS=[['HDFC',/hdfc/i],['ICICI',/icici/i],['SBI Card',/sbi card|sbicard/i],['Axis',/axis bank/i],['Kotak',/kotak/i],['Amex',/american express|amex/i],['IDFC FIRST',/idfc/i],['Yes Bank',/yes bank/i],['RBL',/\brbl\b/i],['IndusInd',/indusind/i],['StanChart',/standard chartered/i],['Citi',/citibank|\bciti\b/i],['AU',/au small finance/i],['Federal',/federal bank/i],['OneCard',/onecard|fpl technologies/i],['HSBC',/hsbc/i],['IDBI',/idbi/i],['PNB',/punjab national/i],['BoB',/bank of baroda/i]];
-function detectCard(head){
-  let best=null;
-  for(const [n,re] of BANKS){const m=head.match(re);if(m&&(best===null||m.index<best.i))best={n,i:m.index}}
-  const l=head.match(/(?:[\dXx*•]{4}[\s-]+){2,3}(\d{4})\b/);
-  return(best?best.n:'Card')+'|'+(l?l[1]:'????');
+const VARIANTS=[['Amazon Pay',/amazon\s?pay/i],['Adani One',/adani\s?one/i],['Swiggy',/swiggy/i],['Regalia Gold',/regalia\s?gold/i],['Regalia',/regalia/i],['Millennia',/millennia/i],['Tata Neu',/tata\s?neu/i],['Infinia',/infinia/i],['Diners',/diners/i],['Super.money',/super\.?\s?money/i],['Flipkart',/flipkart/i],['Magnus',/magnus/i],['Atlas',/atlas/i],['Rubyx',/rubyx/i],['Coral',/coral/i],['Sapphiro',/sapphiro/i],['MakeMyTrip',/makemytrip/i],['RuPay',/rupay/i]];
+function last4(text){
+  const re=/(?<![\dX*•])(?:[\dX*•][\s-]?){12,19}(?![\dX*•])/g;
+  for(const m of text.matchAll(re)){
+    const s=m[0].replace(/[\s-]/g,'');
+    if(!/[X*•]{4,}/.test(s))continue;
+    const i=Math.max(s.lastIndexOf('X'),s.lastIndexOf('*'),s.lastIndexOf('•'));
+    const l4=s.slice(i+1,i+5);
+    if(/^\d{4}$/.test(l4)&&i+1>=8)return l4;
+  }
+  return null;
+}
+function detectCard(head,all,fileId,text){
+  let bank=null;
+  for(const [n,re] of BANKS){const m=head.match(re);if(m&&(bank===null||m.index<bank.i))bank={n,i:m.index}}
+  let v=null;
+  const prose=(text||head).replace(/rupay\s*\/\s*american[^\n]*/ig,'');
+  for(const [n,re] of VARIANTS){const c=(prose.match(new RegExp(re.source,'gi'))||[]).length;if(c&&(v===null||c>v.c))v={n,c}}
+  const l4=last4(head)||last4(all);
+  if(!v&&/(?<![\dX])(6[05]\d\d|508\d|8[12]\d\d)[\dX]{2,4}X{4,}/.test(head))v={n:'RuPay'};
+  const b=bank?bank.n:'Card';
+  return{key:b+'|'+(l4||'f'+fileId),name:b+(v?' '+v.n:'')+(l4?' ••'+l4:'')};
+}
+function markEmiConversions(tx){
+  for(const c of tx){
+    if(!c.cr||!/emi/i.test(c.desc)||c.emiPair)continue;
+    const d=tx.find(o=>!o.cr&&!o.emiPair&&Math.abs(o.amt+c.amt)<0.01);
+    if(d){d.emiPair=c.emiPair=true}
+  }
 }
 async function processFile(file,rec){
   const buf=new Uint8Array(await file.arrayBuffer());
@@ -270,27 +336,34 @@ async function processFile(file,rec){
   let pdf;
   try{pdf=await task.promise}catch(e){if(cancelled)throw new Error('Skipped, no password given');throw e}
   const lines=await extractLines(pdf);
-  const head=lines.slice(0,80).join(' ');
   const years={};(lines.join(' ').match(/\b20\d{2}\b/g)||[]).forEach(y=>years[y]=(years[y]||0)+1);
   const year=+Object.keys(years).sort((a,b)=>years[b]-years[a])[0]||new Date().getFullYear();
-  const cardKey=detectCard(head);
-  const {tx,skipped}=parseLines(lines,year);
+  const {tx,skipped,firstTx,isTx}=parseLines(lines,year);
+  const head=lines.slice(0,firstTx>0?firstTx:60).join(' ');
+  const card=detectCard(head,lines.slice(0,120).join(' '),rec.id,lines.filter((l,i)=>!isTx.has(i)).join('\n'));
+  markEmiConversions(tx);
+  const cardKey=card.key;
+  if(!store.cardNames[cardKey]){store.cardNames[cardKey]=card.name;save()}
   rec.cardKey=cardKey;rec.skipped=skipped;rec.sample=lines.slice(0,40);rec.pages=pdf.numPages;
+  rec.due=findDue(lines);
   const seen=new Set(state.txns.map(t=>t.sig));
   let added=0,dup=0;
   for(const t of tx){
     const sig=[cardKey,t.date,t.amt,t.desc.toUpperCase().replace(/\s+/g,' ')].join('|');
-    if(seen.has(sig)&&!state.txns.some(o=>o.sig===sig&&o.fileId===rec.id)){dup++;continue}
-    state.txns.push({id:nextId++,fileId:rec.id,sig,card:cardKey,date:t.date,desc:t.desc,amt:t.amt,cr:t.cr,cat:classify(t.desc,t.cr),manual:false});
+    if(seen.has(sig)){dup++;continue}
+    state.txns.push({id:nextId++,fileId:rec.id,sig,card:cardKey,date:t.date,desc:t.desc,amt:t.amt,cr:t.cr,cat:t.emiPair?'Ignore':classify(t.desc,t.cr),emi:!!t.emiPair,manual:false});
     added++;
   }
+  const cyc=tx.reduce((m,t)=>t.date>m?t.date:m,'').slice(0,7);
+  for(const t of state.txns)if(t.fileId===rec.id)t.cyc=cyc;
   rec.n=added;rec.dup=dup;rec.status='ok';
 }
 async function handleFiles(list){
   if(!window.pdfjsLib){toast('The PDF reader could not load. Reload the app.');return}
   pdfjsLib.GlobalWorkerOptions.workerSrc='pdf.worker.min.js';
   for(const f of list){
-    const rec={id:nextId++,name:f.name,status:'reading',n:0,dup:0,skipped:[],sample:[]};
+    if(state.files.some(x=>x.name===f.name&&x.size===f.size&&x.status==='ok')){toast(f.name+' is already loaded');continue}
+    const rec={id:nextId++,name:f.name,size:f.size,status:'reading',n:0,dup:0,skipped:[],sample:[]};
     state.files.push(rec);renderUpload();
     try{await processFile(f,rec)}catch(e){rec.status='error';rec.error=(e&&e.message)||String(e)}
     renderUpload();
@@ -299,8 +372,8 @@ async function handleFiles(list){
 }
 
 /* ---------- derived ---------- */
-const months=()=>[...new Set(state.txns.map(t=>t.date.slice(0,7)))].sort().reverse();
-const visible=()=>state.txns.filter(t=>state.month==='all'||t.date.startsWith(state.month));
+const months=()=>[...new Set(state.txns.map(t=>t.cyc))].sort().reverse();
+const visible=()=>state.txns.filter(t=>state.month==='all'||t.cyc===state.month);
 function monthName(m){const[y,mo]=m.split('-');return['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+mo-1]+' '+y}
 
 /* ---------- rendering ---------- */
@@ -311,28 +384,48 @@ function showTab(){
 }
 function renderAll(){showTab();renderUpload();renderSummary();renderTx();renderSetup()}
 
+function fileStats(f){
+  let spend=0,refund=0,pay=0;const pays=[];
+  for(const t of state.txns){if(t.fileId!==f.id)continue;
+    if(t.cat==='Ignore'){pay+=Math.abs(t.amt);pays.push(t)}else if(t.amt>0)spend+=t.amt;else refund+=-t.amt}
+  return{spend,refund,pay,pays,net:spend-refund};
+}
 function renderUpload(){
   const el=$('#fileList');
   if(!state.files.length){el.innerHTML='';return}
-  let h='<div class="card"><h2>Statements</h2>';
+  let h='';
+  const ok=state.files.filter(f=>f.status==='ok');
+  if(ok.length){
+    let net=0,due=0,dueN=0;
+    for(const f of ok){net+=fileStats(f).net;const d=f.dueOverride!=null?f.dueOverride:f.due;if(d!=null){due+=d;dueN++}}
+    const diff=net-due;
+    h+='<div class="card"><h2>Cross-check</h2><div class="stats"><div class="stat"><div class="k">Parsed net spend</div><div class="v">'+fmt(net)+'</div></div><div class="stat"><div class="k">Statements due</div><div class="v">'+(dueN?fmt(due):'–')+'</div><div class="p">'+dueN+' of '+ok.length+' found</div></div><div class="stat"><div class="k">Difference</div><div class="v" style="color:'+(dueN&&Math.abs(diff)>Math.max(100,due*0.02)?'var(--bad)':'inherit')+'">'+(dueN?fmt(diff):'–')+'</div></div></div><div class="muted" style="margin-top:8px">Due also includes any unpaid previous balance, EMIs and fees, so small gaps are normal. A big gap on one card usually means rows were misread there. Open that card below.</div></div>';
+  }
+  h+='<div class="card"><h2>Statements</h2>';
   for(const f of state.files){
     h+='<div class="file"><div class="nm">'+esc(f.name)+'</div>';
     if(f.status==='reading')h+='<div class="muted">Reading…</div>';
     else if(f.status==='error')h+='<span class="tag bad">Could not read</span><span class="muted">'+esc(f.error||'')+'</span>';
     else{
-      h+='<div style="margin:4px 0"><span class="tag'+(f.n?'':' bad')+'">'+f.n+' transactions</span>'+(f.dup?'<span class="tag warn">'+f.dup+' duplicates skipped</span>':'')+'</div>';
-      h+='<div class="row"><span class="muted">Card name</span><input type="text" class="grow" data-card="'+esc(f.cardKey)+'" value="'+esc(cardLabel(f.cardKey))+'"></div>';
-      if(f.cardKey.endsWith('????'))h+='<div class="muted" style="margin-top:4px">Couldn\'t find the last 4 digits. Rename this card so it stays distinct.</div>';
-      if(!f.n){h+='<details open><summary>Nothing parsed. First lines of the file, so the layout can be checked</summary><pre>'+esc(f.sample.join('\n'))+'</pre></details>'}
-      else if(f.skipped.length){h+='<details><summary>'+f.skipped.length+' dated lines not read, check these</summary><pre>'+esc(f.skipped.join('\n'))+'</pre></details>'}
+      const st=fileStats(f);const d=f.dueOverride!=null?f.dueOverride:f.due;
+      const gap=d!=null?st.net-d:null;const bad=gap!=null&&Math.abs(gap)>Math.max(100,d*0.02);
+      h+='<div style="margin:4px 0"><span class="tag'+(f.n?'':' bad')+'">'+f.n+' rows</span>'+(f.dup?'<span class="tag warn">'+f.dup+' duplicates skipped</span>':'')+(bad?'<span class="tag bad">doesn\'t match due</span>':(gap!=null?'<span class="tag">matches due</span>':''))+'</div>';
+      h+='<div class="row"><span class="muted">Card</span><input type="text" class="grow" data-card="'+esc(f.cardKey)+'" value="'+esc(cardLabel(f.cardKey))+'"></div>';
+      h+='<table style="margin-top:6px"><tr><td>Spends</td><td class="r">'+fmt2(st.spend)+'</td></tr><tr><td>Refunds / credits</td><td class="r">−'+fmt2(st.refund)+'</td></tr><tr><td><b>Net spend</b></td><td class="r"><b>'+fmt2(st.net)+'</b></td></tr><tr><td>Card payments &amp; EMI conversions left out</td><td class="r">'+fmt2(st.pay)+'</td></tr>'
+        +'<tr><td>Statement total due</td><td class="r"><input type="number" step="0.01" inputmode="decimal" data-due="'+f.id+'" value="'+(d!=null?d.toFixed(2):'')+'" placeholder="enter" style="width:120px;text-align:right"></td></tr></table>';
+      if(f.due==null)h+='<div class="muted">Couldn\'t find the total due in this PDF. Type it in to cross-check.</div>';
+      h+='<div class="row" style="margin-top:6px"><button class="btn sm" data-showfile="'+f.id+'">See this statement\'s rows</button></div>';
+      if(st.pays.length)h+='<details><summary>Payments left out ('+st.pays.length+')</summary><pre>'+esc(st.pays.map(t=>t.date+'  '+fmt2(t.amt)+'  '+t.desc).join('\n'))+'</pre></details>';
+      if(!f.n){h+='<details open><summary>Nothing parsed. First lines of the file</summary><pre>'+esc(f.sample.join('\n'))+'</pre></details>'}
+      else if(f.skipped.length){h+='<details><summary>'+f.skipped.length+' dated lines not read</summary><pre>'+esc(f.skipped.join('\n'))+'</pre></details>'}
+      h+='<button class="btn sm danger" data-rmfile="'+f.id+'" style="margin-top:6px">Remove statement</button>';
     }
     h+='</div>';
   }
   h+='</div>';
-  if(state.txns.length)h+='<div class="row"><button class="btn pri" data-go="summary">See summary</button><button class="btn danger" id="clearAll">Clear loaded statements</button></div>';
+  if(state.txns.length)h+='<div class="row"><button class="btn pri" data-go="summary">See summary</button><button class="btn danger" id="clearAll">Clear all</button></div>';
   el.innerHTML=h;
 }
-
 function renderSummary(){
   const el=$('#v-summary');
   if(!state.txns.length){el.innerHTML='<div class="empty">Add statements on the Upload tab to see your buckets.</div>';return}
@@ -345,13 +438,13 @@ function renderSummary(){
     if(t.cat==='Ignore'){ignored+=Math.abs(t.amt);continue}
     by[t.cat]=(by[t.cat]||0)+t.amt;total+=t.amt;
     bk[BUCKET[t.cat]||'Other']+=t.amt;
-    const c=cards[t.card]=cards[t.card]||{n:0,v:0};c.n++;c.v+=t.amt;
+    const c=cards[cardLabel(t.card)]=cards[cardLabel(t.card)]||{n:0,v:0};c.n++;c.v+=t.amt;
     if(!t.cr){const k=merchantKey(t.desc)||t.desc.toUpperCase().slice(0,20);const m=mer[k]=mer[k]||{v:0,n:0};m.v+=t.amt;m.n++}
   }
   const rows=CATS.map(c=>c[0]).filter(c=>c!=='Ignore').map(c=>({c,v:by[c]||0,b:(+store.budgets[c]||0)*nm})).filter(r=>r.v>0.5||r.b>0).sort((a,b)=>b.v-a.v);
   const max=Math.max(1,...rows.map(r=>Math.max(r.v,r.b)));
-  let h='<div class="row" style="margin-bottom:10px"><select id="monthSel"><option value="all">All months ('+ms.length+')</option>'+ms.map(m=>'<option value="'+m+'"'+(m===state.month?' selected':'')+'>'+monthName(m)+'</option>').join('')+'</select></div>';
-  h+='<div class="card"><div class="muted">Total spend</div><div class="big">'+fmt(total)+'</div><div class="muted">'+tx.filter(t=>t.cat!=='Ignore').length+' transactions across '+Object.keys(cards).length+' cards'+(ignored?' · '+fmt(ignored)+' of card payments left out':'')+'</div>';
+  let h='<div class="row" style="margin-bottom:10px"><select id="monthSel"><option value="all">All statements ('+ms.length+' cycle'+(ms.length>1?'s':'')+')</option>'+ms.map(m=>'<option value="'+m+'"'+(m===state.month?' selected':'')+'>'+monthName(m)+' statements</option>').join('')+'</select></div>';
+  h+='<div class="card"><div class="muted">Total spend</div><div class="big">'+fmt(total)+'</div><div class="muted">'+tx.filter(t=>t.cat!=='Ignore').length+' transactions across '+Object.keys(cards).length+' cards'+(ignored?' · '+fmt(ignored)+' of card payments & EMI conversions left out':'')+'</div>';
   h+='<div class="stats" style="margin-top:12px">';
   for(const k of['Needs','Wants','Other']){h+='<div class="stat"><div class="k">'+k+'</div><div class="v">'+fmt(bk[k])+'</div><div class="p">'+(total>0?Math.round(bk[k]/total*100):0)+'%</div></div>'}
   h+='</div></div>';
@@ -363,12 +456,12 @@ function renderSummary(){
   if(!Object.keys(store.budgets).length)h+='<div class="muted" style="margin-top:8px">Set monthly budgets in Setup to see over/under here.</div>';
   h+='</div>';
   const cr=Object.entries(cards).sort((a,b)=>b[1].v-a[1].v);
-  h+='<div class="card"><h2>By card</h2><table><tr><th>Card</th><th class="r">Txns</th><th class="r">Spend</th></tr>'+cr.map(([k,c])=>'<tr><td>'+esc(cardLabel(k))+'</td><td class="r">'+c.n+'</td><td class="r">'+fmt(c.v)+'</td></tr>').join('')+'</table></div>';
+  h+='<div class="card"><h2>By card</h2><table><tr><th>Card</th><th class="r">Txns</th><th class="r">Spend</th></tr>'+cr.map(([k,c])=>'<tr><td>'+esc(k)+'</td><td class="r">'+c.n+'</td><td class="r">'+fmt(c.v)+'</td></tr>').join('')+'</table></div>';
   const tm=Object.entries(mer).sort((a,b)=>b[1].v-a[1].v).slice(0,8);
   h+='<div class="card"><h2>Top merchants</h2><table>'+tm.map(([k,m])=>'<tr><td>'+esc(k)+'</td><td class="r">'+m.n+'×</td><td class="r">'+fmt(m.v)+'</td></tr>').join('')+'</table></div>';
   if(state.month==='all'&&ms.length>1){
-    const bm={};for(const t of state.txns){if(t.cat==='Ignore')continue;const m=t.date.slice(0,7);bm[m]=(bm[m]||0)+t.amt}
-    h+='<div class="card"><h2>By month</h2><table>'+ms.map(m=>'<tr><td>'+monthName(m)+'</td><td class="r">'+fmt(bm[m]||0)+'</td></tr>').join('')+'</table><div class="muted" style="margin-top:6px">Calendar months, so a statement cycle can split across two.</div></div>';
+    const bm={};for(const t of state.txns){if(t.cat==='Ignore')continue;const m=t.cyc;bm[m]=(bm[m]||0)+t.amt}
+    h+='<div class="card"><h2>By statement cycle</h2><table>'+ms.map(m=>'<tr><td>'+monthName(m)+'</td><td class="r">'+fmt(bm[m]||0)+'</td></tr>').join('')+'</table></div>';
   }
   const rev=state.txns.filter(t=>t.cat==='Other'&&!t.manual).length;
   if(rev)h+='<button class="btn" data-review="1" style="width:100%">'+rev+' transactions still in "Other", review them</button>';
@@ -377,13 +470,13 @@ function renderSummary(){
 
 function filtered(){
   const f=state.f,q=f.q.trim().toUpperCase();
-  return visible().filter(t=>(!f.card||t.card===f.card)&&(!f.cat||t.cat===f.cat)&&(!f.review||(t.cat==='Other'&&!t.manual))&&(!q||t.desc.toUpperCase().includes(q))).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  return visible().filter(t=>(!f.card||sameCard(t,f.card))&&(!f.cat||t.cat===f.cat)&&(!f.review||(t.cat==='Other'&&!t.manual))&&(!q||t.desc.toUpperCase().includes(q))&&(!f.file||t.fileId===f.file)).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
 }
 function renderTx(){
   const el=$('#v-tx');
   if(!state.txns.length){el.innerHTML='<div class="empty">No transactions yet.</div>';return}
-  const cards=[...new Set(state.txns.map(t=>t.card))];
-  let h='<div class="card"><div class="row"><select id="fCard" class="grow"><option value="">All cards</option>'+cards.map(c=>'<option value="'+esc(c)+'"'+(state.f.card===c?' selected':'')+'>'+esc(cardLabel(c))+'</option>').join('')+'</select>'
+  const cards=[...new Set(state.txns.map(t=>cardLabel(t.card)))].sort();
+  let h='<div class="card"><div class="row"><select id="fCard" class="grow"><option value="">All cards</option>'+cards.map(c=>'<option value="'+esc(c)+'"'+(state.f.card===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select>'
   +'<select id="fCat" class="grow"><option value="">All buckets</option>'+CATS.map(c=>'<option'+(state.f.cat===c[0]?' selected':'')+'>'+esc(c[0])+'</option>').join('')+'</select></div>'
   +'<div class="row" style="margin-top:8px"><input type="text" id="fQ" class="grow" placeholder="Search merchant" value="'+esc(state.f.q)+'"></div>'
   +'<div class="chips" style="margin:10px 0 0"><span class="chip'+(state.f.review?' on':'')+'" id="fRev">Needs review</span><span class="chip'+(state.applySimilar?' on':'')+'" id="fSim">Apply to similar merchants</span></div></div>'
@@ -394,9 +487,9 @@ function renderTx(){
 function renderTxList(){
   const el=$('#txList');if(!el)return;
   const list=filtered();
-  let h='<div class="muted" style="margin-bottom:6px">'+list.length+' transactions</div>';
+  let h='<div class="muted" style="margin-bottom:6px">'+list.length+' transactions'+(state.f.file?' in one statement <button class="btn sm" id="fFileClr">show all</button>':'')+'</div>';
   for(const t of list.slice(0,state.limit)){
-    h+='<div class="tx"><div class="grow"><div class="d">'+esc(t.desc)+'</div><div class="m">'+t.date+' · '+esc(cardLabel(t.card))+(t.cr?' · credit':'')+'</div></div><div class="r"><div class="a'+(t.cr?' cr':'')+'">'+(t.cr?'−':'')+fmt2(t.amt)+'</div><select data-id="'+t.id+'">'+CATS.map(c=>'<option'+(c[0]===t.cat?' selected':'')+'>'+esc(c[0])+'</option>').join('')+'</select></div></div>';
+    h+='<div class="tx"><div class="grow"><div class="d">'+esc(t.desc)+'</div><div class="m">'+t.date+' · '+esc(cardLabel(t.card))+(t.cr?' · credit':'')+'</div></div><div class="r"><div class="a'+(t.cr?' cr':'')+'"><button class="btn sm" data-flip="'+t.id+'" title="Switch debit / credit" style="padding:1px 7px;margin-right:4px">±</button>'+(t.cr?'−':'')+fmt2(t.amt)+'</div><select data-id="'+t.id+'">'+CATS.map(c=>'<option'+(c[0]===t.cat?' selected':'')+'>'+esc(c[0])+'</option>').join('')+'</select></div></div>';
   }
   if(list.length>state.limit)h+='<button class="btn" id="more" style="width:100%;margin-top:8px">Show more</button>';
   el.innerHTML=h;
@@ -406,7 +499,7 @@ function renderSetup(){
   const el=$('#v-setup');
   let h='<div class="card"><h2>Monthly budgets</h2><div class="bgrid">';
   for(const [c] of CATS){if(c==='Ignore')continue;h+='<label for="b_'+esc(c)+'">'+esc(c)+'</label><input type="number" inputmode="numeric" min="0" id="b_'+esc(c)+'" data-b="'+esc(c)+'" placeholder="₹ / month" value="'+(store.budgets[c]||'')+'">'}
-  h+='</div><div class="muted" style="margin-top:8px">With "All months" selected, budgets scale by the number of months in your data.</div></div>';
+  h+='</div><div class="muted" style="margin-top:8px">With "All statements" selected, budgets scale by the number of statement cycles loaded.</div></div>';
   h+='<div class="card"><h2>Your rules ('+store.rules.length+')</h2>';
   if(!store.rules.length)h+='<div class="muted">When you change a transaction\'s bucket, the merchant is remembered here and applied to future statements.</div>';
   for(let i=0;i<store.rules.length;i++){const r=store.rules[i];h+='<div class="row" style="padding:5px 0"><span class="grow">'+esc(r.key)+' → <b>'+esc(r.category)+'</b></span><button class="btn sm" data-delrule="'+i+'">Remove</button></div>'}
@@ -460,8 +553,12 @@ document.addEventListener('click',async e=>{
   const t=e.target.closest('button,[data-cat],.chip');if(!t)return;
   if(t.dataset.tab){state.tab=t.dataset.tab;showTab();window.scrollTo(0,0);return}
   if(t.dataset.go){state.tab=t.dataset.go;showTab();return}
-  if(t.dataset.cat){state.f={card:'',cat:t.dataset.cat,q:'',review:false};state.limit=100;state.tab='tx';renderTx();showTab();return}
-  if(t.dataset.review){state.f={card:'',cat:'',q:'',review:true};state.limit=100;state.tab='tx';renderTx();showTab();return}
+  if(t.dataset.cat){state.f={card:'',cat:t.dataset.cat,q:'',review:false,file:0};state.limit=100;state.tab='tx';renderTx();showTab();return}
+  if(t.dataset.review){state.f={card:'',cat:'',q:'',review:true,file:0};state.limit=100;state.tab='tx';renderTx();showTab();return}
+  if(t.dataset.showfile){state.f={card:'',cat:'',q:'',review:false,file:+t.dataset.showfile};state.month='all';state.limit=500;state.tab='tx';renderTx();renderSummary();showTab();window.scrollTo(0,0);return}
+  if(t.id==='fFileClr'){state.f.file=0;renderTxList();return}
+  if(t.dataset.flip){const x=state.txns.find(o=>o.id===+t.dataset.flip);if(x){x.cr=!x.cr;x.amt=-x.amt;if(!x.manual)x.cat=classify(x.desc,x.cr)}renderTxList();renderSummary();renderUpload();return}
+  if(t.dataset.rmfile){const id=+t.dataset.rmfile;state.txns=state.txns.filter(o=>o.fileId!==id);state.files=state.files.filter(o=>o.id!==id);renderAll();return}
   if(t.id==='fRev'){state.f.review=!state.f.review;renderTx();return}
   if(t.id==='fSim'){state.applySimilar=!state.applySimilar;renderTx();return}
   if(t.id==='more'){state.limit+=100;renderTxList();return}
@@ -478,7 +575,8 @@ document.addEventListener('click',async e=>{
 document.addEventListener('change',e=>{
   const t=e.target;
   if(t.id==='fileIn'){const l=[...t.files];t.value='';if(l.length)handleFiles(l);return}
-  if(t.dataset.id){setCat(+t.dataset.id,t.value);return}
+  if(t.dataset.id){setCat(+t.dataset.id,t.value);renderUpload();return}
+  if(t.dataset.due){const f=state.files.find(o=>o.id===+t.dataset.due);if(f){const v=parseFloat(t.value);f.dueOverride=isNaN(v)?null:v;renderUpload()}return}
   if(t.id==='monthSel'){state.month=t.value;renderSummary();renderTx();return}
   if(t.id==='fCard'){state.f.card=t.value;renderTxList();return}
   if(t.id==='fCat'){state.f.cat=t.value;renderTxList();return}

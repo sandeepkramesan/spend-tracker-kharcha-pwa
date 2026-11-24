@@ -1,4 +1,4 @@
-const VERSION = 'spend-buckets-v1';
+const VERSION = 'spend-buckets-v3';
 const SHELL = ['./', 'index.html', 'manifest.json', 'pdf.min.js', 'pdf.worker.min.js',
   'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png'];
 
