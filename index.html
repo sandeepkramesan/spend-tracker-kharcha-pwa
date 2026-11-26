@@ -234,6 +234,16 @@ input[type=date]{min-height:44px}
 .bar{position:relative;overflow:visible}
 .bar i{overflow:hidden}
 nav#nav button{font-size:10.5px}
+.srow{display:flex;gap:10px;align-items:flex-start;padding:12px 4px;border-top:1px solid var(--line)}
+.srow:first-child{border-top:0}
+.srow.off{opacity:.45}
+.srow input[type=text],.srow input[type=number]{padding:8px 10px;font-size:14px}
+.srow .selw{min-width:0}
+.srow select{padding:8px 28px 8px 10px;font-size:13px}
+.chk.sm{margin-top:6px;padding:0;border:0;background:none}
+.stag{display:inline-block;margin-top:6px;font-size:11.5px;font-weight:700;color:var(--warn);background:var(--gold-soft);border-radius:99px;padding:2px 9px}
+.stag.bad{color:var(--bad);background:var(--bad-soft)}
+.tx.dim{opacity:.5}.tx.dim .a{text-decoration:line-through}
 @media(max-width:380px){.big{font-size:38px}.stat .v{font-size:17px}}
 </style>
 </head>
@@ -241,7 +251,7 @@ nav#nav button{font-size:10.5px}
 <div id="app">
   <header class="top">
     <div><div class="brand">Kharcha<i>.</i></div><p class="sub0" id="subline">Credit card spends, sorted</p></div>
-    <span class="pill"><span class="dot"></span>On-device <span id="ver">v15</span></span>
+    <span class="pill"><span class="dot"></span>On-device <span id="ver">v16</span></span>
   </header>
 
   <section id="v-upload">
@@ -297,6 +307,13 @@ nav#nav button{font-size:10.5px}
     <label id="cCycRow"><span class="eyebrow">Counts in monthly budget for</span><select id="cCyc"></select></label>
     <div class="row" style="margin-top:6px"><button class="btn grow" data-cashsave="more">Save &amp; add another</button><button class="btn pri grow" data-cashsave="1">Save</button></div>
   </div>
+</div></div>
+<div id="shotSheet" class="sheet"><div class="sheet-box">
+  <div class="sheet-grab"></div>
+  <div class="sheet-head"><div class="ttl">Review spends</div><button class="btn sm ghost" data-srclose="1">Cancel</button></div>
+  <div class="muted" id="srNote" style="padding:0 6px 10px"></div>
+  <div class="sheet-list" id="srList"></div>
+  <div style="padding:12px 4px 0"><button class="btn pri" id="srAdd" style="width:100%">Add</button></div>
 </div></div>
 <div id="toast"></div>
 
@@ -1032,7 +1049,12 @@ const dOf=iso=>new Date(iso+'T00:00:00');
 const addDays=(iso,n)=>{const d=dOf(iso);d.setDate(d.getDate()+n);return isoOf(d)};
 const MNS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const wcfg=()=>store.weekly||(store.weekly={});
-const startDay=()=>Math.min(28,Math.max(1,+wcfg().startDay||1));
+function defaultStartDay(){
+  // line the budget month up with the card statements: the day after the latest statement's last transaction
+  const last=state.txns.filter(t=>t.fileId>0).reduce((m,t)=>t.date>m?t.date:m,'');
+  if(!last)return 1;const d=dOf(addDays(last,1)).getDate();return d>28?1:d;
+}
+const startDay=()=>Math.min(28,Math.max(1,+wcfg().startDay||defaultStartDay()));
 function periodOf(iso){
   const d=dOf(iso),sd=startDay();
   let y=d.getFullYear(),m=d.getMonth();if(d.getDate()<sd){m--;if(m<0){m=11;y--}}
@@ -1048,8 +1070,19 @@ function weekOf(iso){
 function weekRange(off){let w=weekOf(todayIso());for(let i=0;i<Math.abs(off);i++)w=weekOf(off<0?addDays(w.start,-1):addDays(w.end,1));return w}
 const weekLabel=w=>w.s.getMonth()===w.e.getMonth()?w.s.getDate()+'–'+w.e.getDate()+' '+MNS[w.e.getMonth()]:w.s.getDate()+' '+MNS[w.s.getMonth()]+' – '+w.e.getDate()+' '+MNS[w.e.getMonth()];
 const periodLabel2=p=>{const a=dOf(p.start),b=dOf(p.end);return a.getDate()+' '+MNS[a.getMonth()]+' – '+b.getDate()+' '+MNS[b.getMonth()]};
-const spendBetween=(a,b)=>state.txns.filter(t=>isManual(t)&&t.date>=a&&t.date<=b).reduce((s,t)=>s+t.amt,0);
-const weekSpends=w=>state.txns.filter(t=>isManual(t)&&t.date>=w.start&&t.date<=w.end);
+// manual card spends that later show up on a statement are counted once (the statement row wins)
+let wkMatched=new Set();
+function computeMatches(){
+  const S=state.txns.filter(t=>t.fileId>0&&isSpend(t)&&t.amt>0);const used=new Set();wkMatched=new Set();
+  for(const m of state.txns.filter(t=>t.weekOnly).sort((a,b)=>a.date.localeCompare(b.date))){
+    const s=S.find(x=>!used.has(x.id)&&Math.abs(x.amt-m.amt)<1.01&&Math.abs(dOf(x.date)-dOf(m.date))<=3*864e5);
+    if(s){used.add(s.id);wkMatched.add(m.id)}
+  }
+}
+const isStmt=t=>t.fileId>0&&isSpend(t);
+const inWeekly=t=>isStmt(t)||(isManual(t)&&!wkMatched.has(t.id));
+const spendBetween=(a,b)=>state.txns.filter(t=>inWeekly(t)&&t.date>=a&&t.date<=b).reduce((s,t)=>s+t.amt,0);
+const weekSpends=w=>state.txns.filter(t=>(isManual(t)||isStmt(t))&&t.date>=w.start&&t.date<=w.end);
 const splitMode=()=>wcfg().mode!=='fixed'&&budgetTotal()>0;
 // budget for a week: what is left of the month, shared equally by the weeks that remain
 function weekBudget(w){
@@ -1059,8 +1092,9 @@ function weekBudget(w){
 }
 function renderWeekly(){
   const el=$('#v-week');if(!el)return;
+  computeMatches();
   const off=state.weekOff||0,w=weekRange(off),list=weekSpends(w).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
-  const spent=list.reduce((s,t)=>s+t.amt,0),bud=weekBudget(w),left=bud-spent,split=splitMode(),M=budgetTotal();
+  const spent=list.filter(inWeekly).reduce((s,t)=>s+t.amt,0),bud=weekBudget(w),left=bud-spent,split=splitMode(),M=budgetTotal();
   const today=todayIso();
   const daysLeft=off<0?0:Math.max(1,Math.round((w.e-dOf(today))/864e5)+1);
   const title=(off===0?'This week':off===-1?'Last week':'Week')+' · '+(w.idx+1)+' of 4';
@@ -1077,7 +1111,7 @@ function renderWeekly(){
     h+='<div class="muted" style="text-align:center;position:relative;z-index:1;margin-top:6px">Set monthly budgets in Setup and they\'re split into 4 weeks here, or set a fixed weekly amount below.</div>';
   }
   h+='</div>';
-  h+='<button class="btn pri" data-addcash="week" style="width:100%;margin-bottom:14px">＋ Add spend</button>';
+  h+='<div class="row" style="margin-bottom:14px"><button class="btn pri grow" data-addcash="week">＋ Add spend</button><button class="btn grow" id="shotBtn">Import screenshots</button></div><input type="file" id="shotIn" accept="image/*" multiple class="hide">';
   // month plan
   if(split){
     const p=w.p;const ws=[0,1,2,3].map(i=>{const st=addDays(p.start,i*7);return weekOf(st)});
@@ -1093,22 +1127,27 @@ function renderWeekly(){
     h+='<div class="muted" style="margin-top:10px">Each week gets what\'s left of '+fmt(M)+', shared equally by the weeks remaining. Go over one week and the later weeks shrink; spend less and they grow.</div></div>';
   }
   // spends grouped by day
-  h+='<div class="card"><div class="sec"><h2>Spends</h2><span class="muted">'+list.length+' this week</span></div>';
+  const nStmt=list.filter(isStmt).length;
+  h+='<div class="card"><div class="sec"><h2>Spends</h2><span class="muted">'+list.length+' this week'+(nStmt?' · '+nStmt+' from statements':'')+'</span></div>';
   if(!list.length)h+='<div class="muted">Nothing added for this week yet.</div>';
   const days={};for(const t of list)(days[t.date]=days[t.date]||[]).push(t);
   for(const d of Object.keys(days).sort().reverse()){
-    const dt=dOf(d);const dsum=days[d].reduce((s,t)=>s+t.amt,0);
+    const dt=dOf(d);const dsum=days[d].filter(inWeekly).reduce((s,t)=>s+t.amt,0);
     h+='<div class="wday"><span>'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()]+', '+dt.getDate()+' '+MNS[dt.getMonth()]+(d===today?' · today':'')+'</span><span>'+fmt(dsum)+'</span></div>';
-    for(const t of days[d])h+='<div class="tx"><div class="grow"><div class="d"><span class="sw" style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:7px;vertical-align:1px;background:'+catColor(t.cat)+'"></span>'+esc(t.desc)+'</div><div class="m">'+esc(t.cat)+(personOf(t)?' · '+esc(personOf(t)):'')+' · <span class="tag '+(t.weekOnly?'warn':'plain')+'" style="margin:0;padding:1px 7px">'+(t.weekOnly?'Card':'Cash/UPI')+'</span></div></div><div class="r"><div class="a">'+fmt2(t.amt)+'</div><button class="btn sm ghost danger" data-delcash="'+t.id+'">Delete</button></div></div>';
+    for(const t of days[d]){
+      const st=isStmt(t),dup=wkMatched.has(t.id);
+      const tag=st?'<span class="tag plain" style="margin:0;padding:1px 7px">'+esc(cardLabel(t.card))+'</span>':dup?'<span class="tag" style="margin:0;padding:1px 7px">On statement · counted once</span>':'<span class="tag '+(t.weekOnly?'warn':'plain')+'" style="margin:0;padding:1px 7px">'+(t.weekOnly?'Card':'Cash/UPI')+(t.src==='shot'?' · screenshot':'')+'</span>';
+      h+='<div class="tx'+(dup?' dim':'')+'"><div class="grow"><div class="d"><span class="sw" style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:7px;vertical-align:1px;background:'+catColor(t.cat)+'"></span>'+esc(t.desc)+'</div><div class="m">'+esc(t.cat)+(personOf(t)?' · '+esc(personOf(t)):'')+' · '+tag+'</div></div><div class="r"><div class="a'+(t.cr?' cr':'')+'">'+(t.cr?'−':'')+fmt2(t.amt)+'</div>'+(st?'':'<button class="btn sm ghost danger" data-delcash="'+t.id+'">Delete</button>')+'</div></div>';
+    }
   }
   h+='</div>';
   if(list.length){
-    const bc={};for(const t of list)bc[t.cat]=(bc[t.cat]||0)+t.amt;
+    const bc={};for(const t of list.filter(inWeekly))bc[t.cat]=(bc[t.cat]||0)+t.amt;
     const rows=Object.entries(bc).sort((a,b)=>b[1]-a[1]);const mx=Math.max(1,...rows.map(r=>r[1]));
     h+='<div class="card"><h2>By category</h2>'+rows.map(([c,v])=>'<div class="cat" data-cat="'+esc(c)+'"><div class="cat-top"><span class="nm"><span class="sw" style="background:'+catColor(c)+'"></span>'+esc(c)+'</span><span class="amt">'+fmt(v)+'</span></div><div class="bar"><i style="background:'+catColor(c)+';width:'+(v/mx*100).toFixed(1)+'%"></i></div></div>').join('')+'</div>';
   }
   // history
-  const firstM=state.txns.filter(isManual).reduce((m,t)=>!m||t.date<m?t.date:m,'');
+  const firstM=state.txns.filter(t=>isManual(t)||isStmt(t)).reduce((m,t)=>!m||t.date<m?t.date:m,'');
   const hist=[];for(let i=0;i<12;i++){const ww=weekRange(-i);if(!firstM||ww.end<firstM)break;hist.push({w:ww,sp:spendBetween(ww.start,ww.end),b:weekBudget(ww),i})}
   if(hist.length>1){
     const mx=Math.max(1,...hist.map(x=>Math.max(x.sp,x.b)));
@@ -1124,8 +1163,191 @@ function renderWeekly(){
     h+='<input type="number" inputmode="numeric" min="0" id="wBud" style="width:100%" placeholder="₹ / week" value="'+(+wcfg().budget||'')+'">';
   }
   h+='<label class="row" style="margin-top:12px;justify-content:space-between"><span class="muted">Budget month starts on</span><select id="wStart">'+Array.from({length:28},(_,i)=>'<option value="'+(i+1)+'"'+(i+1===sd?' selected':'')+'>'+(i+1)+(i===0?'st':i===1?'nd':i===2?'rd':i>=20&&i%10===0?'st':i>=20&&i%10===1?'nd':i>=20&&i%10===2?'rd':'th')+' of the month</option>').join('')+'</select></label>';
-  h+='<div class="muted" style="margin-top:8px">Weeks 1–3 are 7 days each and week 4 runs to the end of the month. Cash/UPI spends also count in your monthly categories. Card spends you add here count only for the week, since the card statement brings them in later.</div></div>';
+  h+='<div class="muted" style="margin-top:8px">Weeks 1–3 are 7 days each and week 4 runs to the end of the month. Statement transactions are included in the weeks they fall in. Card spends you add by hand (or from screenshots) count for the week; when the same spend later shows up on a statement, it\'s matched and counted once. Cash/UPI spends also count in your monthly categories.'+(wcfg().startDay?'':' The start day follows your statements\' billing cycle.')+'</div></div>';
   el.innerHTML=h;
+}
+/* ---------- screenshot reading (tracker apps such as the one in your screenshot) ---------- */
+const SHOT_MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function shotDate(s,today){
+  today=today||todayIso();
+  if(/today/i.test(s))return today;
+  if(/yesterday|yday/i.test(s))return addDays(today,-1);
+  let m=s.match(/(\d{1,2})\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s*(\d{4})?/i);
+  if(!m){const k=s.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:,?\s*(\d{4}))?/i);if(k)m=[k[0],k[2],k[1],k[3]]}
+  if(m){
+    const ty=+today.slice(0,4);let y=m[3]?+m[3]:ty;const mo=SHOT_MON[m[2].slice(0,3).toLowerCase()],d=+m[1];
+    if(!(d>=1&&d<=31))return null;
+    let iso=y+'-'+pad(mo)+'-'+pad(d);if(!m[3]&&iso>today)iso=(y-1)+'-'+pad(mo)+'-'+pad(d);
+    return iso;
+  }
+  const wd=s.match(/\b(mon|tue|wed|thu|fri|sat|sun)[a-z]*\b/i);
+  if(wd){const want=['sun','mon','tue','wed','thu','fri','sat'].indexOf(wd[1].toLowerCase());let d=today;for(let i=1;i<=7;i++){d=addDays(today,-i);if(dOf(d).getDay()===want)break}return d}
+  return null;
+}
+const indianGroup=n=>{const s=String(n);if(s.length<=3)return s;const last=s.slice(-3);return s.slice(0,-3).replace(/\B(?=(\d{2})+(?!\d))/g,',')+','+last};
+// words: [{t,x0,x1,y0,y1}] in image pixels; W = image width
+function parseShotWords(words,W,today){
+  const MONRX=/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i;
+  const norm=t=>t.replace(/[Il|]/g,'1').replace(/[Oo](?=[\d,])/g,'0');
+  const lineOf=w=>words.filter(o=>Math.abs((o.y0+o.y1)/2-(w.y0+w.y1)/2)<(w.y1-w.y0)*0.6);
+  let cands=words.filter(w=>{
+    if(!/\d/.test(w.t)||/[:\/]/.test(w.t)||w.x0<W*0.4)return false;
+    const t=norm(w.t);
+    if(!/^[^\d\s]{0,2}[\d,]*\d(\.\d{1,2})?$/.test(t))return false;
+    if(lineOf(w).some(o=>o!==w&&MONRX.test(o.t)))return false; // "24 Nov"
+    return true;
+  });
+  if(!cands.length)return[];
+  // amounts share a right edge
+  const bucket={};for(const c of cands){const k=Math.round(c.x1/25);bucket[k]=(bucket[k]||0)+1}
+  const mk=+Object.keys(bucket).sort((a,b)=>bucket[b]-bucket[a])[0];
+  cands=cands.filter(c=>Math.abs(c.x1/25-mk)<=1.6);
+  // something sits where an amount should be but couldn't be read: keep it so the amount can be typed in
+  const yMin=Math.min(...cands.map(c=>c.y0)),yMax=Math.max(...cands.map(c=>c.y0));
+  for(const w of words){
+    if(w.y0<yMin-5||w.y0>yMax+5)continue;
+    if(cands.includes(w)||Math.abs(w.x1/25-mk)>1.6||w.x0<W*0.55||/[:\/#]/.test(w.t)||w.t.length<2)continue;
+    const ln=lineOf(w).map(o=>o.t).join(' ');if(shotDate(ln,today)||/today|yesterday/i.test(ln))continue;
+    if(cands.some(c=>Math.abs(c.y0-w.y0)<(w.y1-w.y0)))continue;
+    cands.push(Object.assign({},w,{unread:true}));
+  }
+  cands.sort((a,b)=>a.y0-b.y0);
+  const hs=cands.filter(c=>!c.unread&&!/,/.test(c.t)).map(c=>c.y1-c.y0).sort((a,b)=>a-b);
+  const hd=hs.length?hs[Math.floor(hs.length/2)]:(cands[0].y1-cands[0].y0)*0.83;
+  const D=0.74*hd,CM=0.28*hd;
+  const gaps=[];for(let i=1;i<cands.length;i++)gaps.push(cands[i].y0-cands[i-1].y0);
+  const rowH=gaps.length?gaps.slice().sort((a,b)=>a-b)[Math.floor(gaps.length/2)]:hd*6;
+  const out=[];
+  cands.forEach((a,i)=>{
+    const next=cands[i+1]?cands[i+1].y0:a.y0+rowH;
+    const t=norm(a.t);
+    const pfx=t.match(/^[^\d]*/)[0];
+    const dec=(t.match(/\.(\d{1,2})$/)||[])[1];
+    const digits=t.replace(/\.\d{1,2}$/,'').replace(/\D/g,'');
+    // the currency sign is often read as a digit (₹210 -> "2210"); the width tells how many characters there really are
+    const opts=[digits];if(digits.length>1)opts.push(digits.slice(1));
+    const width=a.x1-a.x0;
+    let best={o:'0',err:1e9};
+    for(const o of opts){const n=o.replace(/^0+/,'').length||1;const commas=(indianGroup(o.replace(/^0+/,'')||'0').match(/,/g)||[]).length;
+      const pred=D+n*D+commas*CM+(dec?CM+dec.length*D:0);
+      const err=Math.abs(pred-width);if(!best||err<best.err)best={o,err}}
+    let amt=a.unread?null:parseFloat((best.o.replace(/^0+/,'')||'0')+(dec?'.'+dec:''));
+    if(amt!==null&&!(amt>0))return;
+    const top=a.y0-rowH*0.35,bot=next-rowH*0.15;
+    const inBlock=words.filter(w=>w.y0>=top&&w.y0<bot);
+    // merchant: left-hand text nearest the amount line
+    const left=inBlock.filter(w=>w.x1<a.x0-10&&!/^#/.test(w.t)&&!/^[^A-Za-z0-9]+$/.test(w.t));
+    let merchant='';
+    if(left.length){
+      const ys=[...new Set(left.map(w=>Math.round(w.y0/(hd*0.6))))];
+      let bestLine=null,bd=1e9;
+      for(const y of ys){const ln=left.filter(w=>Math.round(w.y0/(hd*0.6))===y);const txt=ln.map(w=>w.t).join(' ');if(!/[A-Za-z]{2}/.test(txt)||shotDate(txt,today))continue;const dd=Math.abs(ln[0].y0-a.y0);if(dd<bd){bd=dd;bestLine=ln}}
+      if(bestLine)merchant=bestLine.sort((p,q)=>p.x0-q.x0).map(w=>w.t).join(' ').replace(/^[^A-Za-z0-9]+/,'').trim();
+    }
+    // date: right-hand text below the amount
+    const right=inBlock.filter(w=>w.x0>W*0.45&&w!==a).sort((p,q)=>p.y0-q.y0||p.x0-q.x0);
+    const date=shotDate(right.map(w=>w.t).join(' '),today);
+    // arrow after the amount: ↗ reads as 7, ↙ as v/w/K
+    const arrow=lineOf(a).filter(w=>w.x0>a.x1).map(w=>w.t).join('');
+    const credit=!!arrow&&!/7/.test(arrow)&&/[vwVWkKL]/.test(arrow);
+    if(!merchant&&!date)return; // row cut off at the edge of the screenshot
+    out.push({desc:merchant||'Spend',amt,date,credit});
+  });
+  return out;
+}
+/* ---------- screenshot import ---------- */
+let ocrWorker=null;
+async function getOcr(){
+  if(ocrWorker)return ocrWorker;
+  if(!window.Tesseract)await new Promise((res,rej)=>{const sc=document.createElement('script');sc.src='ocr/tesseract.min.js';sc.onload=res;sc.onerror=()=>rej(new Error('Text reader could not load'));document.head.appendChild(sc)});
+  const base=new URL('ocr/',location.href).href;
+  ocrWorker=await Tesseract.createWorker('eng',1,{workerPath:base+'worker.min.js',corePath:base,langPath:base.replace(/\/$/,''),gzip:true,workerBlobURL:false});
+  await ocrWorker.setParameters({tessedit_pageseg_mode:'11'});
+  return ocrWorker;
+}
+async function prepShot(file){
+  const img=await createImageBitmap(file);
+  const x0=Math.round(img.width*0.15),w=img.width-x0;
+  const scale=img.height*2>9000?1.5:2;
+  const c=document.createElement('canvas');c.width=Math.round(w*scale);c.height=Math.round(img.height*scale);
+  const g=c.getContext('2d');g.imageSmoothingQuality='high';g.drawImage(img,x0,0,w,img.height,0,0,c.width,c.height);
+  const id=g.getImageData(0,0,c.width,c.height),d=id.data,n=d.length/4;
+  let sum=0;for(let i=0;i<d.length;i+=4){const v=(d[i]*299+d[i+1]*587+d[i+2]*114)/1000|0;d[i]=v;sum+=v}
+  const dark=sum/n<128;const hist=new Uint32Array(256);
+  for(let i=0;i<d.length;i+=4){const v=dark?255-d[i]:d[i];d[i]=v;hist[v]++}
+  let lo=0,hi=255,acc=0;for(let v=0;v<256;v++){acc+=hist[v];if(acc>n*0.02){lo=v;break}}acc=0;for(let v=255;v>=0;v--){acc+=hist[v];if(acc>n*0.02){hi=v;break}}
+  const k=255/Math.max(1,hi-lo);
+  for(let i=0;i<d.length;i+=4){const v=Math.max(0,Math.min(255,(d[i]-lo)*k))|0;d[i]=d[i+1]=d[i+2]=v;d[i+3]=255}
+  g.putImageData(id,0,0);img.close&&img.close();
+  return c;
+}
+const descKey=s=>String(s).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,14);
+async function importShots(files){
+  const btn=$('#shotBtn');const old=btn?btn.textContent:'';
+  const say=m=>{if(btn)btn.textContent=m};
+  try{
+    if(btn)btn.disabled=true;
+    say(ocrWorker?'Reading…':'Getting the text reader ready (first time only)…');
+    const w=await getOcr();
+    let rows=[];
+    for(let i=0;i<files.length;i++){
+      say('Reading screenshot '+(i+1)+' of '+files.length+'…');
+      const c=await prepShot(files[i]);
+      const r=await w.recognize(c);
+      const words=(r.data.words||[]).map(x=>({t:x.text,x0:x.bbox.x0,x1:x.bbox.x1,y0:x.bbox.y0,y1:x.bbox.y1}));
+      rows=rows.concat(parseShotWords(words,c.width));
+    }
+    // overlapping screenshots: keep each transaction once
+    const seen=new Set();rows=rows.filter(r=>{const k=r.date+'|'+r.amt+'|'+descKey(r.desc);if(r.amt!=null&&seen.has(k))return false;seen.add(k);return true});
+    if(!rows.length){toast('No transactions found in '+(files.length>1?'these screenshots':'this screenshot'));return}
+    computeMatches();
+    const stmt=state.txns.filter(t=>t.fileId>0&&isSpend(t)&&t.amt>0);
+    state.shotRows=rows.map(r=>{
+      let status='',on=true;
+      if(r.credit){status='Money in';on=false}
+      else if(r.amt!=null&&state.txns.some(t=>isManual(t)&&t.date===r.date&&Math.abs(t.amt-r.amt)<0.6)){status='Already added';on=false}
+      else if(r.amt!=null&&r.date&&stmt.some(t=>Math.abs(t.amt-r.amt)<1.01&&Math.abs(dOf(t.date)-dOf(r.date))<=3*864e5)){status='On a statement';on=false}
+      else if(r.amt==null)status='Type the amount';
+      return{desc:r.desc,amt:r.amt,date:r.date||todayIso(),cat:classify(r.desc,false),via:'card',on,status};
+    });
+    openShotReview();
+  }catch(err){toast('Could not read: '+((err&&err.message)||err))}
+  finally{if(btn){btn.disabled=false;btn.textContent=old||'Import screenshots'}}
+}
+function openShotReview(){
+  const rows=state.shotRows||[];
+  const cats=catNames().filter(c=>c!=='Ignore');
+  let h='';
+  rows.forEach((r,i)=>{
+    h+='<div class="srow'+(r.on?'':' off')+'" data-sr="'+i+'"><label class="chk sm"><input type="checkbox" data-sron="'+i+'"'+(r.on?' checked':'')+'><span class="box"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></label>'
+      +'<div class="grow"><div class="row" style="gap:6px;flex-wrap:nowrap"><input type="text" class="grow" data-srdesc="'+i+'" value="'+esc(r.desc)+'"><input type="number" inputmode="decimal" step="0.01" data-sramt="'+i+'" value="'+(r.amt==null?'':r.amt)+'" placeholder="₹" style="width:92px;text-align:right'+(r.amt==null?';border-color:var(--bad)':'')+'"></div>'
+      +'<div class="row" style="gap:6px;margin-top:6px;flex-wrap:nowrap"><input type="date" data-srdate="'+i+'" value="'+r.date+'" style="width:140px;min-height:38px;padding:6px 8px"><select data-srcat="'+i+'" class="grow">'+cats.map(c=>'<option'+(c===r.cat?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select><button class="btn sm" data-srvia="'+i+'">'+(r.via==='card'?'Card':'Cash')+'</button></div>'
+      +(r.status?'<div class="stag'+(r.status==='Type the amount'?' bad':'')+'">'+esc(r.status)+'</div>':'')+'</div></div>';
+  });
+  $('#srList').innerHTML=h;
+  updateShotCount();
+  const p=$('#shotSheet');p.classList.add('on');document.body.classList.add('noscroll');requestAnimationFrame(()=>p.classList.add('in'));
+}
+function updateShotCount(){
+  const rows=(state.shotRows||[]).filter(r=>r.on&&r.amt>0);
+  const tot=rows.reduce((s,r)=>s+r.amt,0);
+  $('#srAdd').textContent=rows.length?'Add '+rows.length+' spend'+(rows.length>1?'s':'')+' · '+fmt(tot):'Nothing selected';
+  $('#srAdd').disabled=!rows.length;
+  const skipped=(state.shotRows||[]).filter(r=>!r.on).length;
+  $('#srNote').textContent=(state.shotRows||[]).length+' found'+(skipped?' · '+skipped+' unticked (already added, on a statement, or money in)':'')+'. Check the amounts, then add.';
+}
+function closeShot(){const p=$('#shotSheet');p.classList.remove('in');document.body.classList.remove('noscroll');setTimeout(()=>p.classList.remove('on'),220)}
+function addShotRows(){
+  let n=0;
+  for(const r of state.shotRows||[]){
+    if(!r.on||!(r.amt>0))continue;
+    const id=nextId++;const card=r.via==='card';
+    const t={id,fileId:0,sig:'shot|'+id,card:card?WEEK_CARD:CASH,date:r.date,desc:r.desc||'Spend',amt:Math.round(r.amt*100)/100,cr:false,cat:r.cat,manual:true,src:'shot',cyc:card?'':cycleFor(r.date)};
+    if(card)t.weekOnly=true;
+    state.txns.push(t);n++;
+  }
+  saveData();closeShot();state.shotRows=null;renderAll();
+  toast(n+' spend'+(n===1?'':'s')+' added from screenshots');
 }
 /* ---------- transactions tab ---------- */
 function filtered(){
@@ -1286,6 +1508,10 @@ document.addEventListener('click',async e=>{
     t.disabled=false;t.textContent=old;return}
   if(t.dataset.addcash){openCash();if(t.dataset.addcash==='week'&&(state.weekOff||0)!==0){const w=weekRange(state.weekOff);$('#cDate').value=w.end<todayIso()?w.end:todayIso();setCashCycles()}return}
   if(t.dataset.via){setVia(t.dataset.via);return}
+  if(t.id==='shotBtn'){$('#shotIn').click();return}
+  if(t.dataset.srvia!==undefined){const r=state.shotRows[+t.dataset.srvia];r.via=r.via==='card'?'cash':'card';t.textContent=r.via==='card'?'Card':'Cash';return}
+  if(t.id==='srAdd'){addShotRows();return}
+  if(t.dataset.srclose){closeShot();return}
   if(t.dataset.woff){state.weekOff=Math.min(0,(state.weekOff||0)+(+t.dataset.woff));renderWeekly();return}
   if(t.dataset.wgo!==undefined){state.weekOff=+t.dataset.wgo;renderWeekly();window.scrollTo(0,0);return}
   if(t.dataset.wmode){wcfg().mode=t.dataset.wmode;save();renderWeekly();return}
@@ -1338,6 +1564,10 @@ document.addEventListener('click',async e=>{
 });
 document.addEventListener('change',e=>{
   const t=e.target;
+  if(t.id==='shotIn'){const l=[...t.files];t.value='';if(l.length)importShots(l);return}
+  if(t.dataset.sron!==undefined){const r=state.shotRows[+t.dataset.sron];r.on=t.checked;t.closest('.srow').classList.toggle('off',!r.on);updateShotCount();return}
+  if(t.dataset.srdate!==undefined){state.shotRows[+t.dataset.srdate].date=t.value||todayIso();return}
+  if(t.dataset.srcat!==undefined){state.shotRows[+t.dataset.srcat].cat=t.value;return}
   if(t.id==='fileIn'){const l=[...t.files];t.value='';if(l.length)handleFiles(l);return}
   if(t.dataset.id){setCat(+t.dataset.id,t.value);return}
   if(t.dataset.pid){const x=state.txns.find(o=>o.id===+t.dataset.pid);if(x){if(t.value)x.person=t.value;else delete x.person}saveData();renderSummary();renderTxTotals();if(state.f.person)renderTxList();return}
@@ -1356,6 +1586,8 @@ document.addEventListener('change',e=>{
 document.addEventListener('input',e=>{
   const t=e.target;
   if(t.id==='fQ'){state.f.q=t.value;renderTxTotals();renderTxList();return}
+  if(t.dataset.srdesc!==undefined){state.shotRows[+t.dataset.srdesc].desc=t.value;return}
+  if(t.dataset.sramt!==undefined){const r=state.shotRows[+t.dataset.sramt];const v=parseFloat(t.value);r.amt=v>0?v:null;if(r.amt&&!r.on&&r.status==='Type the amount'){}t.style.borderColor=r.amt?'':'var(--bad)';updateShotCount();return}
   if(t.dataset.b!==undefined){const v=parseFloat(t.value);if(v>0)store.budgets[t.dataset.b]=v;else delete store.budgets[t.dataset.b];save();const bt=$('#budgetTotal');if(bt)bt.textContent=fmt(budgetTotal());renderSummary();renderWeekly();return}
   if(t.dataset.card!==undefined){const v=t.value.trim();if(v)store.cardNames[t.dataset.card]=v;else delete store.cardNames[t.dataset.card];save();renderSummary();renderTx();return}
 });
@@ -1410,6 +1642,7 @@ document.addEventListener('click',e=>{
   if(o&&pickSel){const sel=pickSel;const i=+o.dataset.pk;closePicker();if(sel.selectedIndex!==i){sel.selectedIndex=i;sel.dispatchEvent(new Event('change',{bubbles:true}))}e.stopPropagation();return}
   if(e.target.id==='picker'||e.target.closest('#pkClose')){closePicker();e.stopPropagation()}
   if(e.target.id==='cashSheet'){closeCash();e.stopPropagation()}
+  if(e.target.id==='shotSheet'){closeShot();e.stopPropagation()}
 },true);
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&pickSel)closePicker();
@@ -1421,6 +1654,7 @@ document.addEventListener('input',e=>{
 });
 new MutationObserver(()=>enhanceSelects($('#app'))).observe($('#app'),{childList:true,subtree:true});
 enhanceSelects($('#cashSheet'));
+new MutationObserver(()=>enhanceSelects($('#shotSheet'))).observe($('#srList'),{childList:true});
 enhanceSelects($('#app'));
 
 loadData();
