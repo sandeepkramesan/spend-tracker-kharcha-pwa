@@ -210,11 +210,30 @@ body.noscroll{overflow:hidden}
 .hbud .bar{margin:6px 0 0}
 .cform{display:grid;gap:12px;overflow-y:auto;padding:0 4px 4px}
 .cform label{display:grid;gap:6px}
+.cform .hide{display:none!important}
 .cform label input,.cform label .selw,.cform label select{width:100%}
 .cbig{display:flex!important;align-items:baseline;gap:6px;border-bottom:1px solid var(--line);padding-bottom:6px}
 .cbig span{font-family:var(--serif);font-size:30px;color:var(--muted)}
 .cbig input{font-family:var(--serif);font-size:40px;font-weight:500;background:none;border:0;padding:0;width:100%}
 input[type=date]{min-height:44px}
+.seg{display:flex;gap:4px;padding:4px;margin-top:6px;border-radius:14px;background:var(--card2);border:1px solid var(--line)}
+.seg button{flex:1;border:0;background:none;color:var(--muted);font:600 14px var(--sans);padding:9px;border-radius:10px;cursor:pointer}
+.seg button.on{background:var(--acc);color:var(--acc-fg)}
+.wplan{display:flex;gap:12px;align-items:center;padding:11px 8px;border-top:1px solid var(--line)}
+.wplan.cur{background:var(--gold-soft);border-radius:12px;border-top-color:transparent}
+.wplan.cur+.wplan{border-top-color:transparent}
+.wplan .wn{width:34px;height:34px;flex:none;border-radius:10px;background:var(--card2);border:1px solid var(--line);display:grid;place-items:center;font-weight:700;font-size:12px;color:var(--gold)}
+.wplan .sub{font-size:12px;color:var(--muted);margin-top:2px}
+.wplan .sub .o{color:var(--bad);font-weight:600}
+.wnav{font-size:22px;line-height:1;width:40px;height:40px;padding:0;display:grid;place-items:center}
+.wnav:disabled{opacity:.3}
+.wday{display:flex;justify-content:space-between;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:14px 0 4px;border-top:1px solid var(--line)}
+.wday:first-of-type{border-top:0;padding-top:0}
+.wday+.tx{border-top:0}
+.bmark{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--fg);opacity:.55;border-radius:2px}
+.bar{position:relative;overflow:visible}
+.bar i{overflow:hidden}
+nav#nav button{font-size:10.5px}
 @media(max-width:380px){.big{font-size:38px}.stat .v{font-size:17px}}
 </style>
 </head>
@@ -222,7 +241,7 @@ input[type=date]{min-height:44px}
 <div id="app">
   <header class="top">
     <div><div class="brand">Kharcha<i>.</i></div><p class="sub0" id="subline">Credit card spends, sorted</p></div>
-    <span class="pill"><span class="dot"></span>On-device <span id="ver">v13</span></span>
+    <span class="pill"><span class="dot"></span>On-device <span id="ver">v15</span></span>
   </header>
 
   <section id="v-upload">
@@ -237,11 +256,13 @@ input[type=date]{min-height:44px}
   </section>
   <section id="v-summary" class="hide"></section>
   <section id="v-tx" class="hide"></section>
+  <section id="v-week" class="hide"></section>
   <section id="v-setup" class="hide"></section>
 </div>
 <nav id="nav">
   <button data-tab="summary"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg>Overview</button>
   <button data-tab="tx"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r=".8"/><circle cx="4" cy="12" r=".8"/><circle cx="4" cy="18" r=".8"/></svg>Spends</button>
+  <button data-tab="week"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4M8 14h2M12 14h2M16 14h0"/></svg>Weekly</button>
   <button data-tab="upload" class="on"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M3 10h18M7 15h4"/></svg>Statements</button>
   <button data-tab="setup"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Setup</button>
 </nav>
@@ -265,14 +286,15 @@ input[type=date]{min-height:44px}
 </div></div>
 <div id="cashSheet" class="sheet"><div class="sheet-box">
   <div class="sheet-grab"></div>
-  <div class="sheet-head"><div class="ttl">Add cash spend</div><button class="btn sm ghost" data-cashclose="1">Close</button></div>
+  <div class="sheet-head"><div class="ttl" id="cTitle">Add spend</div><button class="btn sm ghost" data-cashclose="1">Close</button></div>
   <div class="cform">
     <label class="cbig"><span>₹</span><input type="number" id="cAmt" inputmode="decimal" min="0" step="0.01" placeholder="0"></label>
     <label><span class="eyebrow">What for</span><input type="text" id="cDesc" placeholder="e.g. Vegetables, auto, tip" autocomplete="off"></label>
     <label><span class="eyebrow">Date</span><input type="date" id="cDate"></label>
     <label><span class="eyebrow">Category</span><select id="cCat"></select></label>
     <label id="cPersonRow"><span class="eyebrow">Person</span><select id="cPerson"></select></label>
-    <label><span class="eyebrow">Counts in budget for</span><select id="cCyc"></select></label>
+    <div><span class="eyebrow">Paid with</span><div class="seg" id="cVia"><button type="button" data-via="cash" class="on">Cash / UPI</button><button type="button" data-via="card">Card</button></div><div class="muted" id="cViaNote" style="margin-top:6px"></div></div>
+    <label id="cCycRow"><span class="eyebrow">Counts in monthly budget for</span><select id="cCyc"></select></label>
     <div class="row" style="margin-top:6px"><button class="btn grow" data-cashsave="more">Save &amp; add another</button><button class="btn pri grow" data-cashsave="1">Save</button></div>
   </div>
 </div></div>
@@ -290,8 +312,8 @@ const pad=n=>String(n).padStart(2,'0');
 
 /* ---------- persistence: everything stays on this device ---------- */
 const LS='cardbuckets.v1',LD='kharcha.data.v1';
-let store={rules:[],budgets:{},cardNames:{},cats:null,people:[],applySimilar:true};
-try{const s=localStorage.getItem(LS);if(s){const o=JSON.parse(s);store.rules=o.rules||[];store.budgets=o.budgets||{};store.cardNames=o.cardNames||{};store.cats=Array.isArray(o.cats)?o.cats:null;store.people=Array.isArray(o.people)?o.people:[];store.applySimilar=o.applySimilar!==false}}catch(e){}
+let store={rules:[],budgets:{},cardNames:{},cats:null,people:[],applySimilar:true,weekly:{}};
+try{const s=localStorage.getItem(LS);if(s){const o=JSON.parse(s);store.rules=o.rules||[];store.budgets=o.budgets||{};store.cardNames=o.cardNames||{};store.cats=Array.isArray(o.cats)?o.cats:null;store.people=Array.isArray(o.people)?o.people:[];store.applySimilar=o.applySimilar!==false;store.weekly=o.weekly&&typeof o.weekly==='object'?o.weekly:{}}}catch(e){}
 function save(){try{localStorage.setItem(LS,JSON.stringify(store))}catch(e){toast('Could not save settings. Phone storage may be full.')}}
 function saveData(){
   try{localStorage.setItem(LD,JSON.stringify({v:1,nextId,txns:state.txns,files:state.files.filter(f=>f.status==='ok').map(f=>{const o=Object.assign({},f);delete o.sample;return o})}))}
@@ -581,7 +603,7 @@ async function handleFiles(list){
 
 /* ---------- derived ---------- */
 const months=()=>[...new Set(state.txns.map(t=>t.cyc).filter(Boolean))].sort().reverse();
-const visible=()=>state.txns.filter(t=>state.month==='all'||t.cyc===state.month);
+const visible=()=>state.txns.filter(t=>!t.weekOnly&&(state.month==='all'||t.cyc===state.month));
 function monthName(m){if(!m)return'';const[y,mo]=m.split('-');return['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+mo-1]+' '+y}
 const periodLabel=()=>state.month==='all'?(months().length>1?'All statements ('+months().length+' cycles)':(months()[0]?monthName(months()[0])+' statements':'All statements')):monthName(state.month)+' statements';
 const personOf=t=>t.person&&store.people.includes(t.person)?t.person:'';
@@ -614,11 +636,11 @@ const budgetTotal=()=>catNames().reduce((s,c)=>s+(c!=='Ignore'&&+store.budgets[c
 /* ---------- rendering ---------- */
 function toast(msg){const t=$('#toast');t.textContent=msg;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',Math.max(2800,msg.length*70))}
 function showTab(){
-  for(const k of['upload','summary','tx','setup']){$('#v-'+k).classList.toggle('hide',state.tab!==k)}
+  for(const k of['upload','summary','tx','week','setup']){$('#v-'+k).classList.toggle('hide',state.tab!==k)}
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.tab===state.tab));
 }
-function renderAll(){showTab();renderUpload();renderCash();renderSummary();renderTx();renderSetup()}
-function refresh(){renderUpload();renderCash();renderSummary();renderTxTotals();renderTxList();renderSetup()}
+function renderAll(){showTab();renderUpload();renderCash();renderSummary();renderTx();renderWeekly();renderSetup()}
+function refresh(){renderUpload();renderCash();renderWeekly();renderSummary();renderTxTotals();renderTxList();renderSetup()}
 
 function fileStats(f){
   let spend=0,refund=0,pay=0;const pays=[];
@@ -969,12 +991,12 @@ function renderCash(){
 }
 function openCash(){
   const today=todayIso();
-  $('#cAmt').value='';$('#cDesc').value='';$('#cDate').value=today;$('#cDate').max=today;
+  $('#cAmt').value='';$('#cDesc').value='';$('#cDate').value=today;$('#cDate').max=today;$('#cDate').min='';
   const fill=(sel,opts,v)=>{sel.innerHTML=opts.map(o=>'<option value="'+esc(o[0])+'"'+(o[0]===v?' selected':'')+'>'+esc(o[1])+'</option>').join('')};
   fill($('#cCat'),catNames().filter(c=>c!=='Ignore').map(c=>[c,c]),'Other');
   $('#cPersonRow').classList.toggle('hide',!store.people.length);
   fill($('#cPerson'),[['','No person']].concat(store.people.map(p=>[p,p])),'');
-  setCashCycles();
+  setCashCycles();setVia('cash');
   $('#cashSheet').classList.add('on');document.body.classList.add('noscroll');
   requestAnimationFrame(()=>{$('#cashSheet').classList.add('in');setTimeout(()=>$('#cAmt').focus(),250)});
 }
@@ -983,17 +1005,127 @@ function setCashCycles(){
   const opts=[...new Set(months().concat([def,nextMon(months()[0]||def)]))].sort().reverse();
   const sel=$('#cCyc');sel.innerHTML=opts.map(m=>'<option value="'+m+'"'+(m===def?' selected':'')+'>'+monthName(m)+(months().includes(m)?' statements':'')+'</option>').join('');
 }
+function setVia(v){
+  state.via=v;document.querySelectorAll('#cVia button').forEach(b=>b.classList.toggle('on',b.dataset.via===v));
+  $('#cCycRow').classList.toggle('hide',v==='card');
+  $('#cViaNote').textContent=v==='card'?'Counts for the weekly budget only. Your card statement adds it to the monthly totals.':'Counts for the weekly budget and the monthly categories.';
+}
 function closeCash(){const p=$('#cashSheet');p.classList.remove('in');document.body.classList.remove('noscroll');setTimeout(()=>p.classList.remove('on'),220)}
 function saveCash(more){
-  const amt=parseFloat($('#cAmt').value);const desc=$('#cDesc').value.trim()||'Cash';const date=$('#cDate').value||todayIso();
+  const amt=parseFloat($('#cAmt').value);const desc=$('#cDesc').value.trim()||(state.via==='card'?'Card spend':'Cash');const date=$('#cDate').value||todayIso();
   if(!(amt>0)){toast('Enter the amount');$('#cAmt').focus();return}
   const id=nextId++;
-  const t={id,fileId:0,sig:'cash|'+id,card:CASH,date,desc,amt:Math.round(amt*100)/100,cr:false,cat:$('#cCat').value,manual:true,cyc:$('#cCyc').value||cycleFor(date)};
+  const card=state.via==='card';
+  const t={id,fileId:0,sig:'cash|'+id,card:card?WEEK_CARD:CASH,date,desc,amt:Math.round(amt*100)/100,cr:false,cat:$('#cCat').value,manual:true,cyc:card?'':($('#cCyc').value||cycleFor(date))};
+  if(card)t.weekOnly=true;
   if($('#cPerson').value)t.person=$('#cPerson').value;
   state.txns.push(t);saveData();
-  toast(fmt2(t.amt)+' cash spend added to '+t.cat);
+  toast(fmt2(t.amt)+' added to '+t.cat+(card?' (this week only)':''));
   if(more){$('#cAmt').value='';$('#cDesc').value='';$('#cAmt').focus()}else closeCash();
   renderAll();
+}
+/* ---------- weekly budget: the month is split into 4 weeks that add up to the monthly budget ---------- */
+const WEEK_CARD='Card (manual)';
+const isManual=t=>isCash(t)||!!t.weekOnly;
+const isoOf=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const dOf=iso=>new Date(iso+'T00:00:00');
+const addDays=(iso,n)=>{const d=dOf(iso);d.setDate(d.getDate()+n);return isoOf(d)};
+const MNS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const wcfg=()=>store.weekly||(store.weekly={});
+const startDay=()=>Math.min(28,Math.max(1,+wcfg().startDay||1));
+function periodOf(iso){
+  const d=dOf(iso),sd=startDay();
+  let y=d.getFullYear(),m=d.getMonth();if(d.getDate()<sd){m--;if(m<0){m=11;y--}}
+  const start=isoOf(new Date(y,m,sd)),end=addDays(isoOf(new Date(y,m+1,sd)),-1);
+  return{start,end};
+}
+function weekOf(iso){
+  const p=periodOf(iso);
+  const idx=Math.min(3,Math.floor((dOf(iso)-dOf(p.start))/864e5/7));
+  const start=addDays(p.start,idx*7),end=idx===3?p.end:addDays(start,6);
+  return{p,idx,start,end,s:dOf(start),e:dOf(end)};
+}
+function weekRange(off){let w=weekOf(todayIso());for(let i=0;i<Math.abs(off);i++)w=weekOf(off<0?addDays(w.start,-1):addDays(w.end,1));return w}
+const weekLabel=w=>w.s.getMonth()===w.e.getMonth()?w.s.getDate()+'–'+w.e.getDate()+' '+MNS[w.e.getMonth()]:w.s.getDate()+' '+MNS[w.s.getMonth()]+' – '+w.e.getDate()+' '+MNS[w.e.getMonth()];
+const periodLabel2=p=>{const a=dOf(p.start),b=dOf(p.end);return a.getDate()+' '+MNS[a.getMonth()]+' – '+b.getDate()+' '+MNS[b.getMonth()]};
+const spendBetween=(a,b)=>state.txns.filter(t=>isManual(t)&&t.date>=a&&t.date<=b).reduce((s,t)=>s+t.amt,0);
+const weekSpends=w=>state.txns.filter(t=>isManual(t)&&t.date>=w.start&&t.date<=w.end);
+const splitMode=()=>wcfg().mode!=='fixed'&&budgetTotal()>0;
+// budget for a week: what is left of the month, shared equally by the weeks that remain
+function weekBudget(w){
+  if(!splitMode())return +wcfg().budget||0;
+  const M=budgetTotal();const before=spendBetween(w.p.start,addDays(w.start,-1));
+  return Math.max(0,(M-before)/(4-w.idx));
+}
+function renderWeekly(){
+  const el=$('#v-week');if(!el)return;
+  const off=state.weekOff||0,w=weekRange(off),list=weekSpends(w).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  const spent=list.reduce((s,t)=>s+t.amt,0),bud=weekBudget(w),left=bud-spent,split=splitMode(),M=budgetTotal();
+  const today=todayIso();
+  const daysLeft=off<0?0:Math.max(1,Math.round((w.e-dOf(today))/864e5)+1);
+  const title=(off===0?'This week':off===-1?'Last week':'Week')+' · '+(w.idx+1)+' of 4';
+  let h='<div class="card hero"><div class="row" style="justify-content:space-between;position:relative;z-index:1"><button class="btn sm ghost wnav" data-woff="-1" aria-label="Previous week">‹</button><div style="text-align:center"><div class="eyebrow">'+esc(title)+'</div><div class="muted" style="margin-top:4px">'+esc(weekLabel(w))+'</div></div><button class="btn sm ghost wnav" data-woff="1" aria-label="Next week"'+(off>=0?' disabled':'')+'>›</button></div>';
+  h+='<div class="big" style="text-align:center;position:relative;z-index:1">'+money(spent)+'</div>';
+  if(bud>0||split){
+    const base=split?M/4:bud,adj=split&&Math.abs(bud-base)>=1;
+    h+='<div class="muted" style="text-align:center;position:relative;z-index:1">spent of '+fmt(bud)+' budget this week'+(adj?'<br><span class="chg '+(bud<base?'up':'down')+'">'+(bud<base?'▼ '+fmt(base-bud)+' less':'▲ '+fmt(bud-base)+' more')+' than the usual '+fmt(base)+', to stay within the month</span>':'')+'</div>';
+    h+='<div class="bar" style="margin:14px 0 12px;height:8px;position:relative;z-index:1"><i style="background:'+(left<0?'var(--bad)':'var(--pos)')+';width:'+(bud>0?Math.min(100,spent/bud*100):100).toFixed(1)+'%"></i></div>';
+    h+='<div class="stats"><div class="stat"><div class="k">'+(left<0?'Over':'Left')+'</div><div class="v" style="color:'+(left<0?'var(--bad)':'var(--pos)')+'">'+fmt(Math.abs(left))+'</div></div>'
+      +(off===0?'<div class="stat"><div class="k">Days left</div><div class="v">'+daysLeft+'</div></div><div class="stat"><div class="k">Per day</div><div class="v">'+(left>0?fmt(left/daysLeft):'₹0')+'</div></div>'
+      :'<div class="stat"><div class="k">Spends</div><div class="v">'+list.length+'</div></div><div class="stat"><div class="k">Used</div><div class="v">'+(bud>0?Math.round(spent/bud*100)+'%':'–')+'</div></div>')+'</div>';
+  }else{
+    h+='<div class="muted" style="text-align:center;position:relative;z-index:1;margin-top:6px">Set monthly budgets in Setup and they\'re split into 4 weeks here, or set a fixed weekly amount below.</div>';
+  }
+  h+='</div>';
+  h+='<button class="btn pri" data-addcash="week" style="width:100%;margin-bottom:14px">＋ Add spend</button>';
+  // month plan
+  if(split){
+    const p=w.p;const ws=[0,1,2,3].map(i=>{const st=addDays(p.start,i*7);return weekOf(st)});
+    const mSpent=spendBetween(p.start,p.end),mLeft=M-mSpent;
+    h+='<div class="card"><div class="sec"><h2>Month plan · '+esc(periodLabel2(p))+'</h2><span class="muted">'+fmt(M)+'</span></div>';
+    h+='<div class="paybar"><div><div class="eyebrow">Left this month</div><div class="mid" style="color:'+(mLeft<0?'var(--bad)':'inherit')+'">'+(mLeft<0?fmt(-mLeft)+' over':fmt(mLeft))+'</div></div><div style="text-align:right"><div class="eyebrow">Spent</div><div class="muted" style="font-weight:600;font-size:14px;margin-top:4px">'+fmt(mSpent)+' of '+fmt(M)+'</div></div></div>';
+    h+='<div class="bar" style="margin:10px 0 6px"><i style="background:'+(mLeft<0?'var(--bad)':'var(--gold)')+';width:'+Math.min(100,mSpent/M*100).toFixed(1)+'%"></i></div>';
+    for(const x of ws){
+      const sp=spendBetween(x.start,x.end),b=weekBudget(x),past=x.end<today,cur=x.start<=today&&today<=x.end,over=sp>b+0.5;
+      const status=past?(over?'<span class="o">'+fmt(sp-b)+' over</span>':fmt(b-sp)+' saved'):cur?'this week · '+fmt(Math.max(0,b-sp))+' left':'planned';
+      h+='<div class="wplan'+(cur?' cur':'')+'"><div class="wn">W'+(x.idx+1)+'</div><div class="grow"><div class="row" style="justify-content:space-between"><span style="font-weight:600">'+esc(weekLabel(x))+'</span><span style="font-weight:600">'+(past||cur?fmt(sp)+' <span class="muted" style="font-weight:500">/ '+fmt(b)+'</span>':fmt(b))+'</span></div><div class="sub">'+status+'</div></div></div>';
+    }
+    h+='<div class="muted" style="margin-top:10px">Each week gets what\'s left of '+fmt(M)+', shared equally by the weeks remaining. Go over one week and the later weeks shrink; spend less and they grow.</div></div>';
+  }
+  // spends grouped by day
+  h+='<div class="card"><div class="sec"><h2>Spends</h2><span class="muted">'+list.length+' this week</span></div>';
+  if(!list.length)h+='<div class="muted">Nothing added for this week yet.</div>';
+  const days={};for(const t of list)(days[t.date]=days[t.date]||[]).push(t);
+  for(const d of Object.keys(days).sort().reverse()){
+    const dt=dOf(d);const dsum=days[d].reduce((s,t)=>s+t.amt,0);
+    h+='<div class="wday"><span>'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()]+', '+dt.getDate()+' '+MNS[dt.getMonth()]+(d===today?' · today':'')+'</span><span>'+fmt(dsum)+'</span></div>';
+    for(const t of days[d])h+='<div class="tx"><div class="grow"><div class="d"><span class="sw" style="display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:7px;vertical-align:1px;background:'+catColor(t.cat)+'"></span>'+esc(t.desc)+'</div><div class="m">'+esc(t.cat)+(personOf(t)?' · '+esc(personOf(t)):'')+' · <span class="tag '+(t.weekOnly?'warn':'plain')+'" style="margin:0;padding:1px 7px">'+(t.weekOnly?'Card':'Cash/UPI')+'</span></div></div><div class="r"><div class="a">'+fmt2(t.amt)+'</div><button class="btn sm ghost danger" data-delcash="'+t.id+'">Delete</button></div></div>';
+  }
+  h+='</div>';
+  if(list.length){
+    const bc={};for(const t of list)bc[t.cat]=(bc[t.cat]||0)+t.amt;
+    const rows=Object.entries(bc).sort((a,b)=>b[1]-a[1]);const mx=Math.max(1,...rows.map(r=>r[1]));
+    h+='<div class="card"><h2>By category</h2>'+rows.map(([c,v])=>'<div class="cat" data-cat="'+esc(c)+'"><div class="cat-top"><span class="nm"><span class="sw" style="background:'+catColor(c)+'"></span>'+esc(c)+'</span><span class="amt">'+fmt(v)+'</span></div><div class="bar"><i style="background:'+catColor(c)+';width:'+(v/mx*100).toFixed(1)+'%"></i></div></div>').join('')+'</div>';
+  }
+  // history
+  const firstM=state.txns.filter(isManual).reduce((m,t)=>!m||t.date<m?t.date:m,'');
+  const hist=[];for(let i=0;i<12;i++){const ww=weekRange(-i);if(!firstM||ww.end<firstM)break;hist.push({w:ww,sp:spendBetween(ww.start,ww.end),b:weekBudget(ww),i})}
+  if(hist.length>1){
+    const mx=Math.max(1,...hist.map(x=>Math.max(x.sp,x.b)));
+    h+='<div class="card"><h2>Past weeks</h2>'+hist.map(x=>{const over=x.b>0&&x.sp>x.b+0.5;return '<div class="cat" data-wgo="'+(-x.i)+'"><div class="cat-top"><span class="nm">'+esc(x.i===0?'This week':weekLabel(x.w))+'</span><span class="amt">'+fmt(x.sp)+'</span></div><div class="bar"><i style="background:'+(over?'var(--bad)':'var(--gold)')+';width:'+(x.sp/mx*100).toFixed(1)+'%"></i>'+(x.b>0?'<b class="bmark" style="left:'+(x.b/mx*100).toFixed(1)+'%"></b>':'')+'</div><div class="sub">'+(x.b>0?'budget '+fmt(x.b)+' · '+(over?'<span class="o">'+fmt(x.sp-x.b)+' over</span>':fmt(x.b-x.sp)+' under'):'')+'</div></div>'}).join('')+'<div class="muted" style="margin-top:8px">The thin line marks that week\'s budget.</div></div>';
+  }
+  // settings
+  const sd=startDay();
+  h+='<div class="card"><h2>Weekly budget</h2><div class="seg" style="margin:0 0 12px"><button type="button" data-wmode="split" class="'+(wcfg().mode!=='fixed'?'on':'')+'">Split monthly budget</button><button type="button" data-wmode="fixed" class="'+(wcfg().mode==='fixed'?'on':'')+'">Fixed amount</button></div>';
+  if(wcfg().mode!=='fixed'){
+    h+=M>0?'<div class="row" style="justify-content:space-between"><span class="muted">Monthly budget (from Setup)</span><b>'+fmt(M)+'</b></div><div class="row" style="justify-content:space-between;margin-top:4px"><span class="muted">Usual week (÷ 4)</span><b>'+fmt(M/4)+'</b></div>'
+       :'<div class="muted">No monthly budget yet. <button class="link" data-tab="setup">Set category budgets in Setup</button> and they\'ll be split into 4 weeks.</div>';
+  }else{
+    h+='<input type="number" inputmode="numeric" min="0" id="wBud" style="width:100%" placeholder="₹ / week" value="'+(+wcfg().budget||'')+'">';
+  }
+  h+='<label class="row" style="margin-top:12px;justify-content:space-between"><span class="muted">Budget month starts on</span><select id="wStart">'+Array.from({length:28},(_,i)=>'<option value="'+(i+1)+'"'+(i+1===sd?' selected':'')+'>'+(i+1)+(i===0?'st':i===1?'nd':i===2?'rd':i>=20&&i%10===0?'st':i>=20&&i%10===1?'nd':i>=20&&i%10===2?'rd':'th')+' of the month</option>').join('')+'</select></label>';
+  h+='<div class="muted" style="margin-top:8px">Weeks 1–3 are 7 days each and week 4 runs to the end of the month. Cash/UPI spends also count in your monthly categories. Card spends you add here count only for the week, since the card statement brings them in later.</div></div>';
+  el.innerHTML=h;
 }
 /* ---------- transactions tab ---------- */
 function filtered(){
@@ -1003,7 +1135,7 @@ function filtered(){
 function renderTx(){
   const el=$('#v-tx');
   if(!state.txns.length){el.innerHTML='<div class="empty">No transactions yet.</div>';return}
-  const cards=[...new Set(state.txns.map(t=>cardLabel(t.card)))].sort();
+  const cards=[...new Set(state.txns.filter(t=>!t.weekOnly).map(t=>cardLabel(t.card)))].sort();
   const f=state.f;
   let h='<div class="card hero" id="txTotals"></div><div class="card filters">'+periodSelect('monthSel2')+'<select id="fCard"><option value="">All cards</option>'+cards.map(c=>'<option value="'+esc(c)+'"'+(f.card===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select>'
   +'<select id="fCat"><option value="">All categories</option>'+catNames().map(c=>'<option'+(f.cat===c?' selected':'')+'>'+esc(c)+'</option>').join('')+'</select>';
@@ -1120,14 +1252,14 @@ function backupJson(){return JSON.stringify({kharcha:1,store,data:{nextId,txns:s
 function restore(text){
   const o=JSON.parse(text);
   const s=o.store||o;
-  store={rules:Array.isArray(s.rules)?s.rules.filter(r=>r&&typeof r.key==='string'&&typeof r.category==='string'):[],budgets:s.budgets&&typeof s.budgets==='object'?s.budgets:{},cardNames:s.cardNames&&typeof s.cardNames==='object'?s.cardNames:{},cats:Array.isArray(s.cats)?s.cats:null,people:Array.isArray(s.people)?s.people.filter(p=>typeof p==='string'):[],applySimilar:s.applySimilar!==false};
+  store={rules:Array.isArray(s.rules)?s.rules.filter(r=>r&&typeof r.key==='string'&&typeof r.category==='string'):[],budgets:s.budgets&&typeof s.budgets==='object'?s.budgets:{},cardNames:s.cardNames&&typeof s.cardNames==='object'?s.cardNames:{},cats:Array.isArray(s.cats)?s.cats:null,people:Array.isArray(s.people)?s.people.filter(p=>typeof p==='string'):[],applySimilar:s.applySimilar!==false,weekly:s.weekly&&typeof s.weekly==='object'?s.weekly:{}};
   loadCats();save();
   if(o.data&&Array.isArray(o.data.txns)){state.txns=o.data.txns;state.files=Array.isArray(o.data.files)?o.data.files:[];nextId=Math.max(+o.data.nextId||1,...state.txns.map(t=>t.id+1),...state.files.map(f=>f.id+1),1);saveData()}
 }
 function goTx(f){state.f=Object.assign({card:'',cat:'',q:'',review:false,file:0,person:''},f);state.limit=100;state.tab='tx';renderTx();showTab();window.scrollTo(0,0)}
 
 document.addEventListener('click',async e=>{
-  const t=e.target.closest('button,[data-cat],[data-cardgo],[data-persongo],.chip');if(!t)return;
+  const t=e.target.closest('button,[data-cat],[data-cardgo],[data-persongo],[data-wgo],.chip');if(!t)return;
   if(t.dataset.tab){state.tab=t.dataset.tab;showTab();window.scrollTo(0,0);return}
   if(t.dataset.cat!==undefined&&!t.matches('button')){goTx({cat:t.dataset.cat});return}
   if(t.dataset.cardgo!==undefined){goTx({card:t.dataset.cardgo});return}
@@ -1152,11 +1284,15 @@ document.addEventListener('click',async e=>{
       if(!(await saveFile(nm,blob)))toast('Could not save the PDF here');
     }catch(err){toast('PDF failed: '+((err&&err.message)||err))}
     t.disabled=false;t.textContent=old;return}
-  if(t.dataset.addcash){openCash();return}
+  if(t.dataset.addcash){openCash();if(t.dataset.addcash==='week'&&(state.weekOff||0)!==0){const w=weekRange(state.weekOff);$('#cDate').value=w.end<todayIso()?w.end:todayIso();setCashCycles()}return}
+  if(t.dataset.via){setVia(t.dataset.via);return}
+  if(t.dataset.woff){state.weekOff=Math.min(0,(state.weekOff||0)+(+t.dataset.woff));renderWeekly();return}
+  if(t.dataset.wgo!==undefined){state.weekOff=+t.dataset.wgo;renderWeekly();window.scrollTo(0,0);return}
+  if(t.dataset.wmode){wcfg().mode=t.dataset.wmode;save();renderWeekly();return}
   if(t.dataset.cashclose){closeCash();return}
   if(t.dataset.cashsave){saveCash(t.dataset.cashsave==='more');return}
   if(t.dataset.cashall){goTx({card:CASH});return}
-  if(t.dataset.delcash){const id=+t.dataset.delcash;const x=state.txns.find(o=>o.id===id);if(!x||!confirm('Delete this cash spend of '+fmt2(x.amt)+'?'))return;state.txns=state.txns.filter(o=>o.id!==id);saveData();refresh();renderTx();toast('Cash spend deleted');return}
+  if(t.dataset.delcash){const id=+t.dataset.delcash;const x=state.txns.find(o=>o.id===id);if(!x||!confirm('Delete this spend of '+fmt2(x.amt)+'?'))return;state.txns=state.txns.filter(o=>o.id!==id);saveData();refresh();renderTx();toast('Spend deleted');return}
   if(t.id==='copySum'){copyText(summaryText(),$('#sumBox'));return}
   if(t.id==='dlSum'){if(!(await saveFile('kharcha-summary-'+fileSlug()+'.csv',summaryCsv())))copyText(summaryText(),$('#sumBox'));return}
   if(t.id==='expCsv'){if(!(await saveFile('kharcha-transactions-'+fileSlug()+'.csv',csvText())))toast('Could not download here');return}
@@ -1194,7 +1330,7 @@ document.addEventListener('click',async e=>{
   if(t.id==='resetAll'){
     if(!confirm('Reset Kharcha completely? This deletes statements, transactions, rules, categories, people, budgets and card names.'))return;
     try{localStorage.removeItem(LS);localStorage.removeItem(LD)}catch(err){}
-    store={rules:[],budgets:{},cardNames:{},cats:null,people:[],applySimilar:true};loadCats();
+    store={rules:[],budgets:{},cardNames:{},cats:null,people:[],applySimilar:true,weekly:{}};loadCats();
     state.txns=[];state.files=[];state.month='all';state.f={card:'',cat:'',q:'',review:false,file:0,person:''};nextId=1;state.tab='upload';renderAll();toast('Everything reset');return}
   if(t.id==='dlBackup'){if(!(await saveFile('kharcha-backup.json',backupJson())))copyText(backupJson(),$('#setBox'));return}
   if(t.id==='copyBackup'){copyText(backupJson(),$('#setBox'));return}
@@ -1210,6 +1346,8 @@ document.addEventListener('change',e=>{
   if(t.dataset.paid!==undefined){const on=t.checked;for(const f of state.files){if(f.status==='ok'&&f.cyc===t.dataset.cyc&&cardLabel(f.cardKey)===t.dataset.paid){f.paid=on;if(on)f.paidAt=todayIso();else delete f.paidAt}}saveData();renderSummary();toast(on?t.dataset.paid+' marked as paid':t.dataset.paid+' marked as unpaid');return}
   if(t.dataset.due){const f=state.files.find(o=>o.id===+t.dataset.due);if(f){const v=parseFloat(t.value);f.dueOverride=isNaN(v)?null:v;saveData();renderUpload()}return}
   if(t.id==='cDate'){setCashCycles();return}
+  if(t.id==='wStart'){wcfg().startDay=+t.value;save();state.weekOff=0;renderWeekly();toast('Budget month now starts on day '+t.value);return}
+  if(t.id==='wBud'){const v=parseFloat(t.value);if(v>0)wcfg().budget=v;else delete wcfg().budget;save();renderWeekly();toast(v>0?'Weekly budget: '+fmt(v):'Weekly budget removed');return}
   if(t.id==='monthSel'||t.id==='monthSel2'){state.month=t.value;renderSummary();renderTx();return}
   if(t.id==='fCard'){state.f.card=t.value;renderTxTotals();renderTxList();return}
   if(t.id==='fCat'){state.f.cat=t.value;renderTxTotals();renderTxList();return}
@@ -1218,7 +1356,7 @@ document.addEventListener('change',e=>{
 document.addEventListener('input',e=>{
   const t=e.target;
   if(t.id==='fQ'){state.f.q=t.value;renderTxTotals();renderTxList();return}
-  if(t.dataset.b!==undefined){const v=parseFloat(t.value);if(v>0)store.budgets[t.dataset.b]=v;else delete store.budgets[t.dataset.b];save();const bt=$('#budgetTotal');if(bt)bt.textContent=fmt(budgetTotal());renderSummary();return}
+  if(t.dataset.b!==undefined){const v=parseFloat(t.value);if(v>0)store.budgets[t.dataset.b]=v;else delete store.budgets[t.dataset.b];save();const bt=$('#budgetTotal');if(bt)bt.textContent=fmt(budgetTotal());renderSummary();renderWeekly();return}
   if(t.dataset.card!==undefined){const v=t.value.trim();if(v)store.cardNames[t.dataset.card]=v;else delete store.cardNames[t.dataset.card];save();renderSummary();renderTx();return}
 });
 document.addEventListener('keydown',e=>{

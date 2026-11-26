@@ -1,4 +1,4 @@
-const VERSION = 'kharcha-v13';
+const VERSION = 'kharcha-v15';
 const SHELL = ['./', 'index.html', 'manifest.json', 'pdf.min.js', 'pdf.worker.min.js',
   'fonts/fraunces-latin-opsz-normal.woff2', 'fonts/fraunces-latin-ext-opsz-normal.woff2', 'fonts/plus-jakarta-sans-latin-wght-normal.woff2', 'fonts/plus-jakarta-sans-latin-ext-wght-normal.woff2',
   'jspdf.umd.min.js', 'fonts/pdf-jakarta-400.ttf', 'fonts/pdf-jakarta-700.ttf', 'fonts/pdf-fraunces-500.ttf',
